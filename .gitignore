@@ -1,0 +1,46 @@
+# Node.js dependencies
+node_modules/
+*.tsbuildinfo
+
+# Build outputs
+out/
+dist/
+release/
+*.exe
+*.dmg
+*.AppImage
+
+# Electron build artifacts
+/build/
+
+# Logs and cache
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Local environment
+.env
+.env.*
+
+# App data
+/data/
+.memory/
+memory/
+
+# Editor folders
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Others
+*.swp
+*.swo

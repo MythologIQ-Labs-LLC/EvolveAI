@@ -1,0 +1,11 @@
+
+[
+  {
+    "trigger": "schedule",
+    "action": "open-calendar"
+  },
+  {
+    "trigger": "email",
+    "action": "launch-gmail"
+  }
+]
