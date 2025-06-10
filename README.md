@@ -59,3 +59,18 @@ git clone https://github.com/WulfForge/EvolveAI.git
 cd EvolveAI
 npm install
 npm run start
+npm run dev
+```
+
+The application starts at http://localhost:3000 and opens an Electron window.
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
+
+For an automated LLM setup on Windows you can run scripts\setup-llm.bat.
+
+See [docs/EvolveAI_Documentation.md](docs/EvolveAI_Documentation.md) for detailed user and developer documentation.
