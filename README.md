@@ -1,11 +1,61 @@
-# Evolve AI
+# EvolveAI
 
-**Local-first, hybrid AI assistant for power users. Built by MythologIQ.**
+**EvolveAI** is a privacy-focused local-first desktop application that combines conversational AI, vector memory, and Google Workspace integration to augment productivity while keeping users in full control of their data.
 
-![License](https://img.shields.io/badge/license-MIT-green)
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
-![Status](https://img.shields.io/badge/status-MVP-ready-brightgreen)
+---
 
-...
+## 🚀 Features
 
-MIT License © 2025 MythologIQ, Founder: Kevin R. Knapp
+- 🧠 **Local AI** via Ollama & models like Mistral, LLaMA3, Gemma
+- 🧾 **Contextual Memory** using vector store (Supabase/PostgreSQL)
+- 🔌 **Google API Integration**: Gmail, Drive, Calendar, Docs, Sheets, and 30+ more
+- 📊 **Usage Monitoring**: token usage, estimated costs, and success rates
+- ⚙️ **Rules Engine**: automatic response logic for trigger phrases or routines
+- 🖥️ **Electron-based UI**: runs in a self-contained desktop window
+- 📚 **Built-in Help System** with detailed documentation
+
+---
+
+## 📦 Installation
+
+### 1. Download Installer
+
+- [EvolveAISetup.exe](https://github.com/WulfForge/EvolveAI/releases/latest)
+
+### 2. System Requirements
+
+| Requirement        | Minimum                   | Recommended             |
+|--------------------|---------------------------|--------------------------|
+| OS                 | Windows 10 64-bit         | Windows 11 64-bit       |
+| RAM                | 8 GB                      | 16 GB or higher         |
+| CPU                | 4 cores                   | 8 cores (with AVX2)     |
+| Disk               | 10 GB free                | SSD with 20 GB+         |
+| Network            | Required for APIs         | Required                |
+| GPU (Optional)     | CUDA support for LLMs     | NVIDIA RTX 30xx+        |
+
+---
+
+## 🧠 Local LLM Integration
+
+From the app’s **Settings > Local LLM** tab:
+
+1. Choose a supported model (`tinyllama`, `gemma:2b`, `llama3`, etc.)
+2. EvolveAI will:
+   - Download and install Ollama
+   - Create vector memory storage
+   - Launch Supabase in Docker
+   - Connect everything to form a hybrid Vector/RAG system
+
+✔️ A system check recommends models that fit your RAM/CPU automatically.
+
+---
+
+## 🔧 Developer Setup
+
+### Clone and Run in Dev Mode
+
+```bash
+git clone https://github.com/WulfForge/EvolveAI.git
+cd EvolveAI
+npm install
+npm run start
