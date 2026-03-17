@@ -1,76 +1,376 @@
-# EvolveAI
+# EvolveAI: Autopoietic Memory System
 
-**EvolveAI** is a privacy-focused local-first desktop application that combines conversational AI, vector memory, and Google Workspace integration to augment productivity while keeping users in full control of their data.
+An exploration into theoretical agentic memory architecture—a learning computer that evolves its own neural network-like memory structures rather than serving as a static assistant.
 
----
+## Overview
 
-## 🚀 Features
+EvolveAI implements the **Autopoietic Memory Theory**, a novel approach to machine cognition that treats memory as a self-maintaining, self-organizing system. Unlike traditional databases or retrieval-augmented generation (RAG) systems, EvolveAI's memory actively evolves, decays, and restructures based on usage patterns.
 
-- 🧠 **Local AI** via Ollama & models like Mistral, LLaMA3, Gemma
-- 🧾 **Contextual Memory** using vector store (Supabase/PostgreSQL)
-- 🔌 **Google API Integration**: Gmail, Drive, Calendar, Docs, Sheets, and 30+ more
-- 📊 **Usage Monitoring**: token usage, estimated costs, and success rates
-- ⚙️ **Rules Engine**: automatic response logic for trigger phrases or routines
-- 🖥️ **Electron-based UI**: runs in a self-contained desktop window
-- 📚 **Built-in Help System** with detailed documentation
+### Core Principles
 
----
+| Principle | Description |
+|-----------|-------------|
+| **Adaptive** | Memory that learns, evolves, and restructures based on usage patterns |
+| **Accountable** | Every memory operation is traceable with cryptographic audit trails |
+| **Retrievable** | Intelligent recall mechanisms that surface relevant memories contextually |
 
-## 📦 Installation
+### Anti-Goals
 
-### 1. Download Installer
-
-- [EvolveAISetup.exe](https://github.com/WulfForge/EvolveAI/releases/latest)
-
-### 2. System Requirements
-
-| Requirement        | Minimum                   | Recommended             |
-|--------------------|---------------------------|--------------------------|
-| OS                 | Windows 10 64-bit         | Windows 11 64-bit       |
-| RAM                | 8 GB                      | 16 GB or higher         |
-| CPU                | 4 cores                   | 8 cores (with AVX2)     |
-| Disk               | 10 GB free                | SSD with 20 GB+         |
-| Network            | Required for APIs         | Required                |
-| GPU (Optional)     | CUDA support for LLMs     | NVIDIA RTX 30xx+        |
+This project is explicitly **NOT**:
+- A chatbot or assistant
+- Cloud-dependent (operates entirely locally)
+- A static database (memory must evolve, decay, and restructure)
 
 ---
 
-## 🧠 Local LLM Integration
+## Architecture
 
-From the app’s **Settings > Local LLM** tab:
+### Neural Net Processor
 
-1. Choose a supported model (`tinyllama`, `gemma:2b`, `llama3`, etc.)
-2. EvolveAI will:
-   - Download and install Ollama
-   - Create vector memory storage
-   - Launch Supabase in Docker
-   - Connect everything to form a hybrid Vector/RAG system
+The **Neural Net Processor** serves as the computational engine implementing the Autopoietic Memory Theory. It orchestrates:
 
-✔️ A system check recommends models that fit your RAM/CPU automatically.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    NEURAL NET PROCESSOR                          │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │               LIFECYCLE ORCHESTRATOR                        │ │
+│  │  GROUNDING → SEMANTIC_PAUSE → ACTIVE_FLOW → DETACHMENT     │ │
+│  │                              ↓                              │ │
+│  │                       REM_SYNTHESIS                         │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                              │                                   │
+│  ┌──────────────────────────┴──────────────────────────────┐   │
+│  │                   PROCESSING CORE                        │   │
+│  │  ┌─────────┐    ┌──────────┐    ┌─────────┐             │   │
+│  │  │ ENCODER │ ←→ │ TIER MoE │ ←→ │ DECODER │             │   │
+│  │  └─────────┘    └──────────┘    └─────────┘             │   │
+│  │                                                          │   │
+│  │  ┌──────────────┐    ┌─────────────────────┐            │   │
+│  │  │ DECAY ENGINE │    │ SHADOW GENOME       │            │   │
+│  │  │    (CMHL)    │    │   INTERCEPTOR       │            │   │
+│  │  └──────────────┘    └─────────────────────┘            │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│  ════════════════════════════╪═══════════════════════════════   │
+│                         MEMORY BUS                               │
+│  ════════════════════════════╪═══════════════════════════════   │
+│         ┌────────────────────┼────────────────────┐             │
+│         ▼                    ▼                    ▼             │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
+│  │ L1 TRANSIENT│     │ L2 TEMPORAL │     │  L3 UOR     │       │
+│  │    CACHE    │     │    GRAPH    │     │   VAULT     │       │
+│  └─────────────┘     └─────────────┘     └─────────────┘       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5-Phase Metabolic Lifecycle
+
+Each cognitive cycle progresses through five distinct phases:
+
+1. **GROUNDING** — Establish session context, load soul file, allocate fiber budget
+2. **SEMANTIC_PAUSE** — Safety check against Shadow Genome before execution
+3. **ACTIVE_FLOW** — Execute operations with full pipeline tracing
+4. **DETACHMENT** — Clear transient state, checkpoint L2 graph
+5. **REM_SYNTHESIS** — Learn from traces, crystallize stable memories to L3
+
+### Tri-Layer Memory System
+
+| Tier | Name | Characteristics | Decay Rate |
+|------|------|-----------------|------------|
+| L1 | Transient Cache | Fast vector-based, TTL eviction | λ = 0.1 (aggressive) |
+| L2 | Temporal Graph | CMHL decay, edge traversal, semantic relationships | λ = 0.001 (moderate) |
+| L3 | UOR Vault | Immutable hash chain, O(1) lookup, cryptographic verification | λ = 0 (immortal) |
+
+### Memory Tier Score (MTS) Routing
+
+Memories are routed to tiers using the MTS algorithm:
+
+```
+MTS = (S × Ws) + (A × Wa) + (P × Wp) - (C × Wc)
+```
+
+Where:
+- **S** = Sensitivity (personal data, secrets)
+- **A** = Accuracy requirement (facts, references)
+- **P** = Privilege level (core knowledge, foundational)
+- **C** = Compute constraint (current resource availability)
+
+Routing thresholds:
+- MTS > 0.8 → L3 (UOR Vault)
+- MTS > 0.3 → L2 (Temporal Graph)
+- MTS ≤ 0.3 → L1 (Transient Cache)
+
+### CMHL: Cryptographic Memory Half-Life
+
+Decay is computed lazily on retrieval using exponential decay:
+
+```
+w_current = w₀ × e^(-λt)
+```
+
+Where:
+- `w₀` = initial weight (salience at encoding)
+- `λ` = decay constant (tier-specific)
+- `t` = time since last access
+
+### Shadow Genome
+
+A negative-constraint immune system that blocks execution when intent matches known failure patterns:
+
+- Tracks failure categories: `COMPLEXITY_VIOLATION`, `HALLUCINATION`, `SECURITY_REGRESSION`, etc.
+- Uses cosine similarity against embedded failure traces
+- Provides safety verdicts: `PASS` or `BLOCK`
 
 ---
 
-## 🔧 Developer Setup
+## Project Structure
 
-### Clone and Run in Dev Mode
+```
+src/
+├── core/
+│   ├── processor/          # Main NeuralNetProcessor facade
+│   │   ├── index.ts        # Processor class and factory
+│   │   ├── types.ts        # Public type definitions
+│   │   └── config.ts       # Unified configuration
+│   │
+│   ├── memory/             # Memory encoding/decoding
+│   │   ├── types.ts        # MemoryUnit, Query, RecallResult
+│   │   ├── encoder.ts      # Input → MemoryUnit encoding
+│   │   ├── decoder.ts      # Query → RecallResult decoding
+│   │   └── decay.ts        # CMHL decay engine
+│   │
+│   ├── tiers/              # Tiered memory storage
+│   │   ├── router.ts       # MTS calculation and routing
+│   │   ├── l1-cache.ts     # Transient vector cache
+│   │   ├── l2-graph.ts     # Temporal graph with decay
+│   │   └── l3-vault.ts     # UOR vault interface
+│   │
+│   ├── graph/              # Graph data structures
+│   │   ├── node.ts         # GraphNode definition
+│   │   ├── edge.ts         # Decay-weighted edges
+│   │   ├── traversal.ts    # BFS/DFS with CMHL
+│   │   └── consolidation.ts # Graph pruning
+│   │
+│   ├── chain/              # L3 hash chain
+│   │   ├── hash.ts         # SHA256/UOR hashing
+│   │   ├── block.ts        # Block structure
+│   │   ├── ledger.ts       # Chain management
+│   │   └── verify.ts       # Integrity verification
+│   │
+│   ├── shadow/             # Safety system
+│   │   ├── genome.ts       # Shadow Genome store
+│   │   ├── interceptor.ts  # Semantic pause interceptor
+│   │   └── failure-types.ts # Failure taxonomy
+│   │
+│   └── lifecycle/          # 5-Phase orchestration
+│       ├── orchestrator.ts # State machine
+│       ├── trace.ts        # Pipeline tracing
+│       └── phases/         # Phase implementations
+│           ├── grounding.ts
+│           ├── semantic-pause.ts
+│           ├── active-flow.ts
+│           ├── detachment.ts
+│           └── rem-synthesis.ts
+│
+├── lib/
+│   └── utils/              # Utility functions
+│       ├── hash.ts         # Cryptographic hashing
+│       ├── time.ts         # Temporal utilities
+│       └── id.ts           # UOR ID generation
+│
+└── tests/                  # Test suite
+    ├── core/               # Unit tests
+    ├── integration/        # Integration tests
+    └── fixtures/           # Test data
+```
+
+---
+
+## Installation
 
 ```bash
-git clone https://github.com/WulfForge/EvolveAI.git
-cd EvolveAI
+# Clone the repository
+git clone https://github.com/your-org/evolve-ai.git
+cd evolve-ai
+
+# Install dependencies
 npm install
-npm run start
-npm run dev
+
+# Run tests
+npm test
 ```
 
-The application starts at http://localhost:3000 and opens an Electron window.
+## Usage
 
-### Production Build
+### Basic Usage
+
+```typescript
+import { createProcessor } from './src/core/processor';
+
+// Create processor with default configuration
+const processor = createProcessor();
+
+// Initialize the memory system
+const initResult = await processor.initialize({
+  identity: 'my-agent'
+});
+
+console.log(`Session: ${initResult.sessionId}`);
+console.log(`Genesis Hash: ${initResult.genesisHash}`);
+
+// Encode a memory
+const encodeResult = await processor.encode({
+  content: 'Important fact to remember',
+  metadata: { tags: ['fact', 'reference'] }
+});
+
+console.log(`Stored in: ${encodeResult.tierDecision.tier}`);
+
+// Query memories
+const queryResult = await processor.query({
+  content: 'What facts do I know?',
+  embedding: myEmbeddingFunction('What facts do I know?'),
+  context: { intent: 'recall' }
+});
+
+console.log(`Found ${queryResult.recall.memories.length} memories`);
+
+// Shutdown
+processor.shutdown();
+```
+
+### Custom Configuration
+
+```typescript
+import { createProcessor, createProcessorConfig } from './src/core/processor';
+
+const config = createProcessorConfig({
+  lifecycle: {
+    synthesisThreshold: 20,
+    detachmentStrategy: 'batched'
+  },
+  tierThresholds: {
+    l3: 0.9,  // More selective for L3
+    l2: 0.4
+  },
+  interceptor: {
+    safetyThreshold: 0.9,  // Stricter safety
+    criticalCategories: ['SECURITY_REGRESSION', 'HALLUCINATION']
+  }
+});
+
+const processor = createProcessor(config);
+```
+
+### Event Handling
+
+```typescript
+const processor = createProcessor();
+
+// Subscribe to events
+const unsubscribe = processor.on((event) => {
+  switch (event.type) {
+    case 'MEMORY_ENCODED':
+      console.log(`Encoded ${event.unitId} to ${event.tier}`);
+      break;
+    case 'SAFETY_BLOCK':
+      console.warn(`Blocked: ${event.reason}`);
+      break;
+    case 'SYNTHESIS_COMPLETE':
+      console.log(`Crystallized ${event.result.crystallized} memories`);
+      break;
+  }
+});
+
+// Later: unsubscribe
+unsubscribe();
+```
+
+---
+
+## Testing
+
+### Running Tests
 
 ```bash
-npm run build
-npm start
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test file
+npm test -- src/tests/core/decay.test.ts
+
+# Watch mode
+npm run test:watch
 ```
 
-For an automated LLM setup on Windows you can run scripts\setup-llm.bat.
+### Test Coverage
 
-See [docs/EvolveAI_Documentation.md](docs/EvolveAI_Documentation.md) for detailed user and developer documentation.
+| Module | Status | Coverage |
+|--------|--------|----------|
+| `core/memory/decay` | ✅ Implemented | Unit tests |
+| `core/chain/*` | ✅ Implemented | Unit tests |
+| `core/tiers/router` | ✅ Implemented | Unit tests |
+| `core/lifecycle/*` | ✅ Implemented | Unit tests |
+| `core/graph/*` | ⚠️ Partial | Needs integration tests |
+| `core/shadow/*` | ⚠️ Partial | Needs integration tests |
+| `core/processor` | ⚠️ Partial | Needs end-to-end tests |
+
+### Test Gaps (TODO)
+
+1. **Encoder/Decoder Integration** — Test full encode→store→query→decode flow
+2. **Graph Traversal Edge Cases** — Test cycles, disconnected components, large graphs
+3. **Shadow Genome Effectiveness** — Test blocking accuracy, false positive rates
+4. **L3 Vault Persistence** — Test export/import, recovery from corruption
+5. **Lifecycle Edge Transitions** — Test error recovery, timeout handling
+6. **Memory Pressure** — Test behavior under L1 eviction pressure
+7. **Concurrent Operations** — Test parallel encode/query operations
+8. **Embedding Model Integration** — Test with actual embedding models (MiniLM)
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [CONCEPT.md](docs/CONCEPT.md) | Project DNA — Why, Vibe, Anti-Goals |
+| [ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) | Original architecture blueprint |
+| [NEURAL_NET_PROCESSOR_DESIGN.md](docs/NEURAL_NET_PROCESSOR_DESIGN.md) | Detailed design specification |
+| [AUTOPOIETIC_MEMORY_THEORY.md](docs/AUTOPOIETIC_MEMORY_THEORY.md) | Theoretical foundations |
+| [META_LEDGER.md](docs/META_LEDGER.md) | QoreLogic governance chain |
+
+---
+
+## Contributing
+
+This is an experimental research project. Contributions should align with the project's anti-goals and core principles.
+
+### Development Workflow
+
+1. All changes must pass the Gate Tribunal audit (`/ql-audit`)
+2. Code must adhere to Section 4 Razor constraints:
+   - Functions ≤ 40 lines
+   - Files ≤ 250 lines
+   - Nesting ≤ 3 levels
+3. All changes are logged in the META_LEDGER
+
+---
+
+## License
+
+Apache-2.0 — [See LICENSE file](LICENSE)
+
+---
+
+## Acknowledgments
+
+- **Autopoietic Memory Theory** — Foundational theoretical framework
+- **Prism UOR Foundation** — Model Development Kit for identity algebra
+- **QoreLogic A.E.G.I.S.** — Governance protocol for accountable development
+
+---
+
+*Built with the QoreLogic A.E.G.I.S. lifecycle protocol*
