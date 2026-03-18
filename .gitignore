@@ -1,3 +1,9 @@
+# Rust build artifacts
+target/
+
+# Claude Code local config
+.claude/settings.local.json
+
 # Dependencies
 node_modules/
 npm-debug.log*
