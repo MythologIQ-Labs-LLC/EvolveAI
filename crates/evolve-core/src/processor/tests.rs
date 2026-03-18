@@ -111,6 +111,7 @@ fn test_snapshot_serialization_roundtrip() {
         l2_edges: std::collections::HashMap::new(),
         l3_entries: vec![],
         l3_blocks: vec![crate::chain::block::Block::genesis()],
+        shadow_entries: vec![],
     };
     let json = serde_json::to_string(&snapshot).unwrap();
     let restored: Snapshot = serde_json::from_str(&json).unwrap();
@@ -220,9 +221,57 @@ fn test_restore_rejects_incompatible_version() {
         l2_edges: std::collections::HashMap::new(),
         l3_entries: vec![],
         l3_blocks: vec![crate::chain::block::Block::genesis()],
+        shadow_entries: vec![],
     };
     let engine = MockEngine::new(32);
     let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
     let result = proc.restore(snapshot);
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_processor_check_safety_passes() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let verdict = proc.check_safety("harmless intent").await.unwrap();
+    assert!(matches!(verdict, crate::shadow::interceptor::Verdict::Pass));
+}
+
+#[tokio::test]
+async fn test_processor_record_and_block_failure() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    // Record a failure
+    let trace = crate::shadow::types::FailureTrace {
+        category: crate::shadow::types::FailureCategory::SecurityRegression,
+        severity: crate::shadow::types::Severity::Critical,
+        intent: "disable auth check".to_string(),
+        message: "Security bypass".to_string(),
+        timestamp: 1000,
+    };
+    proc.record_failure(trace, 1000).await.unwrap();
+
+    // Check the same intent — should block (identical embedding)
+    let verdict = proc.check_safety("disable auth check").await.unwrap();
+    assert!(matches!(verdict, crate::shadow::interceptor::Verdict::Block { .. }));
+}
+
+#[tokio::test]
+async fn test_snapshot_includes_shadow() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let trace = crate::shadow::types::FailureTrace {
+        category: crate::shadow::types::FailureCategory::ScopeCreep,
+        severity: crate::shadow::types::Severity::Medium,
+        intent: "add unrequested feature".to_string(),
+        message: "Scope violation".to_string(),
+        timestamp: 1000,
+    };
+    proc.record_failure(trace, 1000).await.unwrap();
+
+    let snap = proc.snapshot(2000);
+    assert!(!snap.shadow_entries.is_empty());
 }

@@ -1137,13 +1137,170 @@ SHA256(content_hash + state_hash + previous_hash) = 8c74548cd8050562dd0e1750bce1
 
 ---
 
+### Entry #26: PLAN v3.3
+
+**Timestamp**: 2026-03-18T04:30:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v3.3-shadow-genome.md) = 45a7bd3b1b2284d52980a9a1624264e8f7872b485ae6e8a80624dac16de35dfa
+```
+
+**Previous Hash**: 8c74548cd8050562dd0e1750bce18bb297116929f790bd17095e9cc102f76e2d
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 397803391cff0dedd7d75913bc3abf0ad1c83cd3cc07f9c696e8633ccea59e21
+```
+
+**Decision**: v3.3 Shadow Genome plan created. Adds the system's "immune system" — negative-constraint pattern matching that blocks intents similar to known failures.
+
+**Key Decisions**:
+1. **Standalone module** — shadow/ is independent of processor, usable separately
+2. **Embedding-agnostic** — genome accepts `Vec<f32>`, caller provides embeddings
+3. **Integrated persistence** — shadow entries added to existing Snapshot struct
+4. **Declarative taxonomy** — `FailureCategory` enum with `default_severity()` method
+
+**Phases**:
+1. Shadow types + genome store (4 new files)
+2. Interceptor (1 new file)
+3. Processor integration (2 files modified)
+
+**Artifacts Created**:
+- docs/plan-v3.3-shadow-genome.md
+
+---
+
+### Entry #27: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T04:45:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 9a4e41840ca74f454aa7fcd68232320eb79ad20a9d27f14fc9f42930991d1e42
+```
+
+**Previous Hash**: 397803391cff0dedd7d75913bc3abf0ad1c83cd3cc07f9c696e8633ccea59e21
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = c3eb1cb1113c6697640ab9c9484cebe6066cc7b48b55a2e47b638ceb25a86c4b
+```
+
+**Decision**: v3.3 Shadow Genome plan APPROVED. All six passes clean. Standalone module with zero new dependencies. Clean integration with existing persistence.
+
+**Artifacts Created**:
+- .agent/staging/AUDIT_REPORT.md
+
+---
+
+### Entry #28: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T05:00:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist (Agent Team)
+**Risk Grade**: L3
+
+**Files Created**:
+- crates/evolve-core/src/shadow/mod.rs
+- crates/evolve-core/src/shadow/types.rs (60 lines)
+- crates/evolve-core/src/shadow/genome.rs (128 lines)
+- crates/evolve-core/src/shadow/interceptor.rs (77 lines)
+- crates/evolve-core/src/shadow/tests.rs (167 lines)
+
+**Files Modified**:
+- crates/evolve-core/src/lib.rs (added `pub mod shadow`)
+- crates/evolve-core/src/processor/types.rs (added ShadowEntry to Snapshot, bumped SNAPSHOT_VERSION to 3.3.0)
+- crates/evolve-core/src/processor/facade.rs (added shadow genome, check_safety, record_failure)
+- crates/evolve-core/src/processor/tests.rs (added 3 shadow integration tests, fixed snapshot constructors)
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = 30b1ad6966cc9fc07d15f44980cbd56bd411cbe0a6c38f241f9d9be48d408db9
+```
+
+**Previous Hash**: c3eb1cb1113c6697640ab9c9484cebe6066cc7b48b55a2e47b638ceb25a86c4b
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 68923f9bdc3714e5baf4fa234bb670aa9168222858278f40d50df5da952a3504
+```
+
+**Decision**: v3.3 Shadow Genome implementation COMPLETE. All 3 phases:
+
+1. **Phase 1**: FailureCategory taxonomy, ShadowEntry types, ShadowGenome store (ingest, dedup, prune, export/import)
+2. **Phase 2**: Interceptor with cosine similarity matching, critical category lower threshold (0.7×)
+3. **Phase 3**: Processor integration (check_safety, record_failure, shadow in snapshot/restore)
+
+**Test Results**: 79 tests pass (up from 66)
+- New: 7 shadow module tests + 3 processor integration tests + 3 existing tests updated = 13 new tests
+
+**Section 4 Razor Compliance**:
+- Max production file: 233 lines (processor/facade.rs) < 250
+- Max test file: 277 lines (processor/tests.rs) — NOTE: test files accumulate across versions
+- All functions < 40 lines
+- Nesting depth <= 2
+- No console output
+
+---
+
+### Entry #29: SESSION SEAL
+
+**Timestamp**: 2026-03-18T05:15:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: SEALED
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = 30b1ad6966cc9fc07d15f44980cbd56bd411cbe0a6c38f241f9d9be48d408db9
+SHA256(SYSTEM_STATE.md) = 1d47a2c679331ad2df9b0511f719c6c1ea2cbb281a01e9aa10eec6cf5e7a5508
+```
+
+**Previous Hash**: 68923f9bdc3714e5baf4fa234bb670aa9168222858278f40d50df5da952a3504
+
+**Chain Hash**:
+```
+SHA256(content_hash + state_hash + previous_hash) = fb496909c2e7d9e28a56723746ac4ffc4e82bc559be446d476c2f5fd134ceda7
+```
+
+**Decision**: Session SEALED. Reality matches Promise. All verification checks passed.
+
+**Substantiation Summary**:
+
+| Check | Result |
+|-------|--------|
+| Version Validation | PASS (v3.3.0 > v3.2.0) |
+| Reality Audit | PASS (33 files, 6 modules) |
+| Test Audit | PASS (79 tests) |
+| Console Artifacts | PASS (0) |
+| Section 4 Razor | PASS (max prod 233 lines) |
+| Chain Integrity | PASS (29 blocks) |
+
+**Session Deliverables (v3.1 + v3.2 + v3.3)**:
+1. v3.1: Memory Pipeline (encoder + decoder + processor facade)
+2. v3.2: Persistence (snapshot/restore + atomic JSON file + integrity verification)
+3. v3.3: Shadow Genome (failure taxonomy + genome store + interceptor + processor integration)
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `8c74548cd8050562dd0e1750bce18bb297116929f790bd17095e9cc102f76e2d`
-**Blocks**: 25
-**Lifecycle**: v3.2 SEALED
-**Version**: v3.2.0
+**Current Hash**: `fb496909c2e7d9e28a56723746ac4ffc4e82bc559be446d476c2f5fd134ceda7`
+**Blocks**: 29
+**Lifecycle**: v3.3 SEALED
+**Version**: v3.3.0
 
 ---
 

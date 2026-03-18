@@ -1,5 +1,6 @@
 use crate::chain::block::Block;
 use crate::memory::types::{MemoryUnit, RecallResult};
+use crate::shadow::types::ShadowEntry;
 use crate::tiers::l2_graph::Edge;
 use crate::tiers::router::RouteDecision;
 use serde::{Deserialize, Serialize};
@@ -41,10 +42,11 @@ pub struct Snapshot {
     pub l2_edges: HashMap<Uuid, Vec<Edge>>,
     pub l3_entries: Vec<MemoryUnit>,
     pub l3_blocks: Vec<Block>,
+    pub shadow_entries: Vec<ShadowEntry>,
 }
 
 /// Current snapshot format version.
-pub const SNAPSHOT_VERSION: &str = "3.2.0";
+pub const SNAPSHOT_VERSION: &str = "3.3.0";
 
 /// Errors from persistence operations.
 #[derive(Debug, thiserror::Error)]

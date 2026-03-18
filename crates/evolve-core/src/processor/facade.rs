@@ -6,6 +6,9 @@ use crate::processor::types::{
     EncodeResult, PersistError, ProcessorStats, QueryResult, Snapshot, SNAPSHOT_VERSION,
 };
 use crate::representation::engine::{EngineError, RepresentationEngine};
+use crate::shadow::genome::ShadowGenome;
+use crate::shadow::interceptor::{self, InterceptorConfig, Verdict};
+use crate::shadow::types::FailureTrace;
 use crate::tiers::l1_cache::L1Cache;
 use crate::tiers::l2_graph::L2Graph;
 use crate::tiers::l3_vault::L3Vault;
@@ -15,6 +18,7 @@ use crate::tiers::l3_vault::L3Vault;
 pub struct ProcessorConfig {
     pub encoder: EncoderConfig,
     pub decoder: DecoderConfig,
+    pub interceptor: InterceptorConfig,
     pub l1_ttl_ms: i64,
     pub l1_max_size: usize,
 }
@@ -24,6 +28,7 @@ impl Default for ProcessorConfig {
         Self {
             encoder: EncoderConfig::default(),
             decoder: DecoderConfig::default(),
+            interceptor: InterceptorConfig::default(),
             l1_ttl_ms: 300_000,
             l1_max_size: 1000,
         }
@@ -39,6 +44,7 @@ pub struct MemoryProcessor<E: RepresentationEngine> {
     l1: L1Cache,
     l2: L2Graph,
     l3: L3Vault,
+    shadow: ShadowGenome,
 }
 
 impl<E: RepresentationEngine> MemoryProcessor<E> {
@@ -48,6 +54,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             l1: L1Cache::new(config.l1_ttl_ms, config.l1_max_size),
             l2: L2Graph::new(),
             l3: L3Vault::new(),
+            shadow: ShadowGenome::default(),
             engine,
             config,
         }
@@ -131,19 +138,38 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         self.l3.verify_integrity()
     }
 
+    /// Check intent safety against the shadow genome.
+    pub async fn check_safety(&mut self, intent: &str) -> Result<Verdict, EngineError> {
+        let rep = self.engine.encode(intent).await?;
+        let embedding = rep.as_vector();
+        Ok(interceptor::check_intent(&embedding, &mut self.shadow, &self.config.interceptor))
+    }
+
+    /// Record a failure trace into the shadow genome.
+    pub async fn record_failure(
+        &mut self,
+        trace: FailureTrace,
+        now: i64,
+    ) -> Result<(), EngineError> {
+        let rep = self.engine.encode(&trace.intent).await?;
+        self.shadow.ingest(trace, rep.as_vector(), now);
+        Ok(())
+    }
+
     /// Capture a snapshot of the persistable system state.
     pub fn snapshot(&self, now: i64) -> Snapshot {
         Snapshot {
-            version: "3.2.0".to_string(),
+            version: SNAPSHOT_VERSION.to_string(),
             created_at: now,
             l2_nodes: self.l2.nodes_vec(),
             l2_edges: self.l2.edges_map().clone(),
             l3_entries: self.l3.entries_vec(),
             l3_blocks: self.l3.ledger().blocks().to_vec(),
+            shadow_entries: self.shadow.export_entries(),
         }
     }
 
-    /// Restore system state from a snapshot. Replaces L2 and L3.
+    /// Restore system state from a snapshot. Replaces L2, L3, and shadow.
     /// Verifies chain integrity and snapshot version before accepting.
     pub fn restore(&mut self, snapshot: Snapshot) -> Result<(), PersistError> {
         if snapshot.version != SNAPSHOT_VERSION {
@@ -160,6 +186,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 
         self.l2 = L2Graph::from_parts(snapshot.l2_nodes, snapshot.l2_edges);
         self.l3 = L3Vault::from_parts(snapshot.l3_entries, ledger);
+        self.shadow.import_entries(snapshot.shadow_entries);
         Ok(())
     }
 
