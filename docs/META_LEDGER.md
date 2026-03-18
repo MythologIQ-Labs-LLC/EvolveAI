@@ -1560,13 +1560,108 @@ SHA256(impl + state + previous) = 791410c61c90c1030e32fc4ab156059f59cf03c52ccf9a
 
 ---
 
+### Entry #38: PLAN v4.0
+
+**Timestamp**: 2026-03-18T08:00:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v4.0-tauri-shell.md) = b1bdb21b18536fc02b93aebd3ebb6899321715d870257e1b0d5b78807e322f72
+```
+
+**Previous Hash**: 791410c61c90c1030e32fc4ab156059f59cf03c52ccf9ae561be93e34dc38757
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 58759b93da32666ef8fcc0511f4e4c674d1a6cc2320e464d27dc23eb02ae3503
+```
+
+**Decision**: v4.0 Tauri v2 Application Shell. Creates desktop app around evolve-core library.
+
+---
+
+### Entry #39: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T08:00:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 60d14b72aaef95e260c33e0bb0397a29dd97ab77f25e7baa5bc5c72c6f011817
+```
+
+**Previous Hash**: 58759b93da32666ef8fcc0511f4e4c674d1a6cc2320e464d27dc23eb02ae3503
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 82d1406c5c6839c629ca7a61c716f7522efd8e3fe89a7f8ec0a681ab50630fcd
+```
+
+**Decision**: v4.0 Tauri v2 Shell APPROVED.
+
+---
+
+### Entry #40: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T08:30:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist
+**Risk Grade**: L3
+
+**Files Created**:
+- src-tauri/Cargo.toml (Tauri v2 binary crate)
+- src-tauri/build.rs
+- src-tauri/tauri.conf.json
+- src-tauri/capabilities/default.json
+- src-tauri/icons/icon.ico
+- src-tauri/src/main.rs (Tauri entry point)
+- src-tauri/src/state.rs (AppProcessor type alias + init)
+- src-tauri/src/commands.rs (7 IPC commands)
+- index.html (Vite entry)
+- vite.config.ts
+- ui/main.tsx
+- ui/App.tsx
+
+**Files Modified**:
+- Cargo.toml (workspace: added src-tauri member)
+
+**Content Hash**:
+```
+SHA256(all .rs files) = f0d79805b4e1e79267096cd079294baf9eed97a03b20186220e8d26844031dba
+```
+
+**Previous Hash**: 82d1406c5c6839c629ca7a61c716f7522efd8e3fe89a7f8ec0a681ab50630fcd
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 0989c89149a24e1291fb4440f796d8793d5ee9870b2a3187b4c2abe8b887dd2c
+```
+
+**Decision**: v4.0 Tauri v2 Application Shell COMPLETE.
+
+Phase 1: Tauri scaffold + 7 IPC commands (encode, query, stats, safety, health, save, load)
+Phase 2: Minimal Vite + React frontend
+
+**Build Verification**:
+- `cargo check -p evolve-app`: PASS (Tauri app compiles)
+- `cargo test -p evolve-core`: PASS (95 tests, core unmodified)
+- Used `tokio::sync::Mutex` for async-safe Tauri state
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `791410c61c90c1030e32fc4ab156059f59cf03c52ccf9ae561be93e34dc38757`
-**Blocks**: 37
-**Lifecycle**: v3.5 SEALED
-**Version**: v3.5.0
+**Current Hash**: `0989c89149a24e1291fb4440f796d8793d5ee9870b2a3187b4c2abe8b887dd2c`
+**Blocks**: 40
+**Lifecycle**: v4.0 IMPLEMENTED
+**Version**: v4.0.0
 
 ---
 
