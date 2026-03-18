@@ -1655,13 +1655,48 @@ Phase 2: Minimal Vite + React frontend
 
 ---
 
+### Entry #41: RESEARCH BRIEF
+
+**Timestamp**: 2026-03-18T09:00:00Z
+**Phase**: RESEARCH
+**Author**: Analyst
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(UOR-FRAMEWORK-ANALYSIS.md) = d26877c7c14124fa8deefb136e2b4ea2ceb60209a058e2cdb8447ace10efd313
+```
+
+**Previous Hash**: 0989c89149a24e1291fb4440f796d8793d5ee9870b2a3187b4c2abe8b887dd2c
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 32597d7141f6d04d42bc2a9902a18981a9f0c9d4c258cf94d59f30dfb693052f
+```
+
+**Decision**: UOR Framework research complete. Findings reveal a fundamental architecture gap: evolve-core stores model-dependent embeddings as canonical identity (Vec<f32>), while UOR establishes model-independent content-addressed identity (BLAKE3 digest) with embeddings as ephemeral views through Observer Reference Frames.
+
+**Key Findings**:
+1. UOR uses BLAKE3 content hashing → Braille glyph encoding for permanent, universal identity
+2. Observer Reference Frames parameterize how data is viewed, not how it's stored
+3. Fiber Budget / Saturation model provides thermodynamic basis for memory decay
+4. Dihedral factorization offers algebraic tier routing (vs current heuristic MTS)
+5. `uor-foundation` crate is `no_std`, zero-dep, Apache-2.0 — integrable as trait definitions
+
+**Recommended Integration**: 4-phase approach (v5.0-v5.3) progressively adopting UOR identity, observer frames, fiber resolution, and full trait implementation.
+
+**Artifacts Created**:
+- docs/Research/UOR-FRAMEWORK-ANALYSIS.md
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `0989c89149a24e1291fb4440f796d8793d5ee9870b2a3187b4c2abe8b887dd2c`
-**Blocks**: 40
-**Lifecycle**: v4.0 IMPLEMENTED
-**Version**: v4.0.0
+**Current Hash**: `32597d7141f6d04d42bc2a9902a18981a9f0c9d4c258cf94d59f30dfb693052f`
+**Blocks**: 41
+**Lifecycle**: RESEARCH COMPLETE
+**Version**: v4.0.0 (v5.0 planning informed by UOR research)
 
 ---
 
