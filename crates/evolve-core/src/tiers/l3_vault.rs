@@ -31,6 +31,11 @@ impl L3Vault {
         self.entries.get(id)
     }
 
+    /// Iterate over all stored units.
+    pub fn iter_units(&self) -> impl Iterator<Item = &MemoryUnit> {
+        self.entries.values()
+    }
+
     /// Number of stored memories.
     pub fn len(&self) -> usize {
         self.entries.len()

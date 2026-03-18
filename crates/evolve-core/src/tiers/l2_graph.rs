@@ -62,6 +62,11 @@ impl L2Graph {
             .collect()
     }
 
+    /// Iterate over all nodes.
+    pub fn iter_units(&self) -> impl Iterator<Item = &MemoryUnit> {
+        self.nodes.values()
+    }
+
     /// Total number of nodes.
     pub fn node_count(&self) -> usize {
         self.nodes.len()

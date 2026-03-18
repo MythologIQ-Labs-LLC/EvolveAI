@@ -808,13 +808,187 @@ SHA256(content_hash + state_hash + previous_hash) = 2d79084852a05951f4e455de58dc
 
 ---
 
+### Entry #18: PLAN v3.1
+
+**Timestamp**: 2026-03-18T02:30:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v3.1-memory-pipeline.md) = 4476ec733ccbfe2464e6f985470e2e3117f7964d2198689c1f3375a7a425511e
+```
+
+**Previous Hash**: 2d79084852a05951f4e455de58dc8e52a0e3aacbee79c556291acfab6eee36fa
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 0b3b121cfefeed785c3d8a0945be73f7037727ebf7ab33b06189a34752745421
+```
+
+**Decision**: v3.1 Memory Pipeline plan created. Addresses the integration gap — the system has building blocks but no intake/retrieval pipeline.
+
+**Key Decisions**:
+1. **Generic processor** `MemoryProcessor<E: RepresentationEngine>` — avoids async_trait dependency, idiomatic for library
+2. **Pure decoder** — `decode()` is a standalone scoring function, caller provides candidates
+3. **Tier scanning** — `iter_units()` added to each tier, keeps scan logic local
+4. **Composable pipelines** — encoder and decoder usable without the facade
+
+**Phases**:
+1. Query types + tier scanning (4 files modified)
+2. Encoder + Decoder pipelines (2 new files)
+3. Processor facade (3 new files)
+
+**Artifacts Created**:
+- docs/plan-v3.1-memory-pipeline.md
+
+---
+
+### Entry #19: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T02:45:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = acc8602fe0f7423418a3240e63e8dbb60c816f818f3aac9e543975361cdf43f7
+```
+
+**Previous Hash**: 0b3b121cfefeed785c3d8a0945be73f7037727ebf7ab33b06189a34752745421
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 12f07d5e62a6a7d166b0d52810ab825cd88ec2f6e3526185b2f7555a0d1812e9
+```
+
+**Decision**: v3.1 Memory Pipeline plan APPROVED. All six audit passes completed successfully: Security, Ghost UI, Section 4 Razor, Dependency, Macro-Level Architecture, and Orphan Detection. No violations found.
+
+**Audit Summary**:
+- Security Pass: PASS (no auth surface, backend library)
+- Ghost UI Pass: PASS (backend-only plan)
+- Section 4 Razor Pass: PASS (max ~140 lines/file, max ~35 lines/function)
+- Dependency Pass: PASS (no new external dependencies)
+- Macro-Level Pass: PASS (clean boundaries, unidirectional flow)
+- Orphan Pass: PASS (all files connected via module tree)
+
+**Artifacts Created**:
+- .agent/staging/AUDIT_REPORT.md
+
+---
+
+### Entry #20: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T03:00:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist
+**Risk Grade**: L3
+
+**Files Created**:
+- crates/evolve-core/src/memory/encoder.rs (57 lines)
+- crates/evolve-core/src/memory/decoder.rs (70 lines)
+- crates/evolve-core/src/processor/mod.rs
+- crates/evolve-core/src/processor/types.rs (27 lines)
+- crates/evolve-core/src/processor/facade.rs (152 lines)
+- crates/evolve-core/src/processor/tests.rs (102 lines)
+
+**Files Modified**:
+- crates/evolve-core/src/lib.rs (added `pub mod processor`)
+- crates/evolve-core/src/memory/mod.rs (added encoder, decoder modules)
+- crates/evolve-core/src/memory/types.rs (added Query, RecallResult, ScoredMemory types)
+- crates/evolve-core/src/memory/tests.rs (added 6 encoder/decoder tests)
+- crates/evolve-core/src/tiers/l1_cache.rs (added `iter_units()`)
+- crates/evolve-core/src/tiers/l2_graph.rs (added `iter_units()`)
+- crates/evolve-core/src/tiers/l3_vault.rs (added `iter_units()`)
+- crates/evolve-core/src/tiers/tests.rs (added 3 iter_units tests)
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = c30e0c2aafc79b5d05d0379ceac1db2b1eca141c553b8a84969b283d9bed0a6a
+```
+
+**Previous Hash**: 12f07d5e62a6a7d166b0d52810ab825cd88ec2f6e3526185b2f7555a0d1812e9
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 7f242136503358c81237a01571c06dfe8230cfa705158e3d94971fca7817ac55
+```
+
+**Decision**: v3.1 Memory Pipeline implementation COMPLETE. All 3 phases implemented:
+
+1. **Phase 1**: Query types (Query, RecallResult, ScoredMemory) + tier scanning (iter_units on L1/L2/L3)
+2. **Phase 2**: Encoder pipeline (RawInput → MemoryUnit via RepresentationEngine) + Decoder pipeline (candidates → scored results)
+3. **Phase 3**: MemoryProcessor facade (encode → route → store, query → scan → score → return)
+
+**Test Results**: 58 tests pass (5 test modules, up from 43)
+- New: 6 encoder/decoder tests + 3 tier scanning tests + 6 processor tests = 15 new tests
+
+**Section 4 Razor Compliance**:
+- Max file: 171 lines (tiers/tests.rs) < 250
+- All functions < 40 lines
+- Nesting depth <= 3
+- No console output
+
+---
+
+### Entry #21: SESSION SEAL
+
+**Timestamp**: 2026-03-18T03:15:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: SEALED
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = c30e0c2aafc79b5d05d0379ceac1db2b1eca141c553b8a84969b283d9bed0a6a
+SHA256(SYSTEM_STATE.md) = acafb05fd03d2eb3a8697dc0316eda9f31f4029ba41b2a6343d319eb7a09fcdf
+```
+
+**Previous Hash**: 7f242136503358c81237a01571c06dfe8230cfa705158e3d94971fca7817ac55
+
+**Chain Hash**:
+```
+SHA256(content_hash + state_hash + previous_hash) = b37bee8b473853ce78b562e9509e8d1d4a4619e680f2f2410aca430023f053a4
+```
+
+**Decision**: Session SEALED. Reality matches Promise. All verification checks passed.
+
+**Substantiation Summary**:
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Version Validation | PASS | v3.1.0 > v3.0.0-alpha (current tag) |
+| Reality Audit | PASS | All planned files exist, 0 missing, 0 unplanned |
+| Test Audit | PASS | 58 tests pass (5 modules) |
+| Console Artifacts | PASS | 0 found |
+| Visual Silence | PASS | N/A (library crate) |
+| Section 4 Razor | PASS | Max file 171 lines, max fn ~35 lines |
+| Chain Integrity | PASS | 21 blocks verified |
+
+**Components Delivered (v3.1)**:
+1. Query types + tier scanning (Phase 1)
+2. Encoder + Decoder pipelines (Phase 2)
+3. MemoryProcessor facade (Phase 3)
+
+**Artifacts Updated**:
+- docs/SYSTEM_STATE.md
+- docs/META_LEDGER.md
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `2d79084852a05951f4e455de58dc8e52a0e3aacbee79c556291acfab6eee36fa`
-**Blocks**: 17
-**Lifecycle**: v3.0 SEALED (Phases 1-3)
-**Version**: v3.0.0-alpha
+**Current Hash**: `b37bee8b473853ce78b562e9509e8d1d4a4619e680f2f2410aca430023f053a4`
+**Blocks**: 21
+**Lifecycle**: v3.1 SEALED
+**Version**: v3.1.0
 
 ---
 

@@ -1,7 +1,7 @@
 # AUDIT REPORT
 
-**Tribunal Date**: 2026-03-18T01:15:00Z
-**Target**: v3.0 Rust Rewrite - Full Rewrite in Rust with GG-CORE Integration
+**Tribunal Date**: 2026-03-18T02:45:00Z
+**Target**: v3.1 Memory Pipeline - Encoder, Decoder, Processor Facade
 **Risk Grade**: L3
 **Auditor**: The QoreLogic Judge
 
@@ -13,21 +13,7 @@
 
 ### Executive Summary
 
-The v3.0 Rust Rewrite plan passes all six audit criteria. The plan proposes a full rewrite of EvolveAI in Rust, integrating with the existing GG-CORE inference runtime and GG-CORE-Tiersynergy multi-tenant layer. The architecture is clean, modular, and follows Rust idioms. Dependencies are justified and align with the existing MythologIQ stack. No security, complexity, or orphan violations found.
-
-**Notable Strengths**:
-- Leverages existing GG-CORE ONNX backend for embeddings (no new ML dependencies)
-- Clean trait-based abstraction (`RepresentationEngine`)
-- Modular design with clear boundaries (representation, memory, tiers, chain)
-- Immutable data structures throughout (Values over State)
-- Dependencies match GG-CORE stack versions (no version conflicts)
-
-**Open Questions** (non-blocking):
-1. Embedding model selection (deferred to implementation)
-2. Persistence strategy (SQLite vs memmap2)
-3. Crate location (workspace member vs separate repo)
-
-These open questions do not block approval as they are implementation details that can be resolved during Phase 1.
+The v3.1 Memory Pipeline plan passes all six audit criteria. The plan proposes an integration layer (encoder, decoder, processor facade) that connects the existing v3.0-alpha building blocks into a usable system. No new external dependencies are introduced. All proposed code stays within Section 4 limits. Module boundaries are clean with unidirectional dependency flow. No security, complexity, or orphan violations found.
 
 ---
 
@@ -50,12 +36,11 @@ Plan scope is backend memory library with no authentication surface.
 
 **Result**: PASS
 
-Backend-only plan with no UI scope. All proposed files are Rust library code:
-- `src/lib.rs` - Crate root
-- `src/representation/*.rs` - Embedding abstraction
-- `src/memory/*.rs` - Memory types and decay
-- `src/tiers/*.rs` - Tier routing
-- `src/chain/*.rs` - Hash chain
+Backend-only plan. All proposed files are Rust library code:
+- `memory/encoder.rs` — Encoding pipeline
+- `memory/decoder.rs` — Decoding/scoring pipeline
+- `processor/facade.rs` — Memory processor struct
+- `processor/types.rs` — Result types
 
 No UI components proposed.
 
@@ -64,45 +49,37 @@ No UI components proposed.
 **Result**: PASS
 
 | Check | Limit | Blueprint Proposes | Status |
-|-------|-------|-------------------|--------|
-| Max function lines | 40 | ~28 | OK |
-| Max file lines | 250 | ~100 | OK |
+|-------|-------|--------------------|--------|
+| Max function lines | 40 | ~35 (facade query) | OK |
+| Max file lines | 250 | ~140 (facade.rs) | OK |
 | Max nesting depth | 3 | 2 | OK |
 | Nested ternaries | 0 | 0 | OK |
 
-All proposed Rust code follows Section 4 simplicity constraints. Functions are focused and short.
+All proposed code follows Section 4 simplicity constraints.
 
 #### Dependency Pass
 
 **Result**: PASS
 
-| Package | Justification | <10 Lines Vanilla? | Verdict |
-|---------|--------------|-------------------|---------|
-| gg-core | ONNX embeddings via existing runtime | No | PASS |
-| gg-core-tiersynergy | Multi-tenant memory isolation | No | PASS |
-| tokio | Async runtime (GG-CORE aligned) | No | PASS |
-| serde | Serialization | No | PASS |
-| uuid | UOR identifiers | No | PASS |
-| chrono | Timestamps | No | PASS |
-| sha2 | Hash chain integrity | No | PASS |
-| thiserror | Error handling | No | PASS |
-| tracing | Observability | No | PASS |
-
-All dependencies are justified and align with the existing GG-CORE dependency tree. No hallucinated packages.
+No new external dependencies. All functionality built on existing workspace crates:
+- `serde` (serialization)
+- `uuid` (ID generation)
+- `sha2` + `hex` (hashing)
+- `chrono` (timestamps)
+- `thiserror` (error handling)
+- `tokio` (async runtime)
 
 #### Macro-Level Architecture Pass
 
 **Result**: PASS
 
-- [x] Clear module boundaries (representation/, memory/, tiers/, chain/, graph/, shadow/)
-- [x] No cyclic dependencies (linear: types → engine → integration)
-- [x] Layering direction enforced (representation ← memory ← tiers)
-- [x] Single source of truth (types.rs per module)
-- [x] Cross-cutting concerns centralized (tracing, thiserror)
-- [x] No duplicated domain logic (similarity functions centralized)
-- [x] Build path explicit (lib.rs, Cargo.toml)
-
-Architecture follows clean Rust module patterns with proper visibility controls.
+- [x] Clear module boundaries (encoder, decoder, processor in separate files)
+- [x] No cyclic dependencies (processor → memory → {tiers, chain, representation})
+- [x] Layering direction enforced (facade → pipelines → subsystems)
+- [x] Single source of truth (memory types centralized in types.rs)
+- [x] Cross-cutting concerns centralized (EngineError for all async operations)
+- [x] No duplicated domain logic (decoder reuses existing similarity and decay functions)
+- [x] Build path explicit (lib.rs declares all modules)
 
 #### Orphan Pass
 
@@ -110,15 +87,13 @@ Architecture follows clean Rust module patterns with proper visibility controls.
 
 | Proposed File | Entry Point Connection | Status |
 |---------------|----------------------|--------|
-| src/lib.rs | Crate root | Connected |
-| src/representation/*.rs | pub mod representation | Connected |
-| src/memory/*.rs | pub mod memory | Connected |
-| src/tiers/*.rs | pub mod tiers | Connected |
-| src/chain/*.rs | pub mod chain | Connected |
-| src/graph/*.rs | pub mod graph | Connected |
-| src/shadow/*.rs | pub mod shadow | Connected |
+| memory/encoder.rs | lib.rs → memory/mod.rs → pub mod encoder | Connected |
+| memory/decoder.rs | lib.rs → memory/mod.rs → pub mod decoder | Connected |
+| processor/mod.rs | lib.rs → pub mod processor | Connected |
+| processor/types.rs | processor/mod.rs → pub mod types | Connected |
+| processor/facade.rs | processor/mod.rs → pub mod facade | Connected |
 
-All modules traced to lib.rs via standard Rust module system.
+All files traced to lib.rs via standard Rust module system.
 
 ---
 
@@ -140,7 +115,7 @@ None required. Plan may proceed to implementation.
 
 ### Verdict Hash
 ```
-SHA256(plan-v3-rust-rewrite.md) = 32A8FB2D2F93EC9D6BDEA9CE60D965563C130A0220130CB752A147D6A2D0B8F9
+SHA256(AUDIT_REPORT.md) = computed at commit time
 ```
 
 ---

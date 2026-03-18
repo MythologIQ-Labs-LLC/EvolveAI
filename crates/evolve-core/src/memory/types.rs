@@ -80,3 +80,43 @@ pub enum Tier {
     L2,
     L3,
 }
+
+/// Query for memory retrieval.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Query {
+    pub content: String,
+    pub constraints: QueryConstraints,
+}
+
+/// Constraints applied to a retrieval query.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct QueryConstraints {
+    pub top_k: Option<usize>,
+    pub min_relevance: Option<f32>,
+    pub require_tier: Option<Tier>,
+    pub exclude_decayed: bool,
+}
+
+/// A memory unit scored against a query.
+#[derive(Clone, Debug)]
+pub struct ScoredMemory {
+    pub unit: MemoryUnit,
+    pub relevance_score: f32,
+    pub decayed_weight: f32,
+}
+
+/// Result of a memory retrieval operation.
+#[derive(Clone, Debug)]
+pub struct RecallResult {
+    pub memories: Vec<ScoredMemory>,
+    pub metrics: RecallMetrics,
+}
+
+/// Metrics captured during retrieval.
+#[derive(Clone, Debug, Default)]
+pub struct RecallMetrics {
+    pub latency_ms: u64,
+    pub tiers_queried: Vec<Tier>,
+    pub candidates_evaluated: usize,
+    pub decay_filtered: usize,
+}

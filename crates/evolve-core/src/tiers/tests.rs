@@ -140,3 +140,32 @@ fn test_l3_vault_chain_grows() {
     // genesis + 2 appends = 3 blocks
     assert_eq!(vault.ledger().len(), 3);
 }
+
+#[test]
+fn test_l1_cache_iter_units_excludes_expired() {
+    let mut cache = l1_cache::L1Cache::new(1000, 100);
+    let u1 = make_unit(vec![], 32);
+    let u2 = make_unit(vec![], 32);
+    cache.insert(u1, 0);
+    cache.insert(u2, 500);
+    // At now=1200, u1 (inserted at 0) is expired, u2 (inserted at 500) is still valid
+    let count = cache.iter_units(1200).count();
+    assert_eq!(count, 1);
+}
+
+#[test]
+fn test_l2_graph_iter_units() {
+    let mut graph = l2_graph::L2Graph::new();
+    graph.insert(make_unit(vec![], 32));
+    graph.insert(make_unit(vec![], 32));
+    graph.insert(make_unit(vec![], 32));
+    assert_eq!(graph.iter_units().count(), 3);
+}
+
+#[test]
+fn test_l3_vault_iter_units() {
+    let mut vault = l3_vault::L3Vault::new();
+    vault.store(make_unit(vec![], 32));
+    vault.store(make_unit(vec![], 32));
+    assert_eq!(vault.iter_units().count(), 2);
+}

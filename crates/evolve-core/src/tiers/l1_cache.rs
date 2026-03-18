@@ -57,6 +57,15 @@ impl L1Cache {
         self.entries.is_empty()
     }
 
+    /// Iterate over all non-expired units.
+    pub fn iter_units(&self, now: i64) -> impl Iterator<Item = &MemoryUnit> {
+        let ttl = self.ttl_ms;
+        self.entries
+            .values()
+            .filter(move |e| now - e.inserted_at <= ttl)
+            .map(|e| &e.unit)
+    }
+
     fn evict_oldest(&mut self) {
         if let Some((&oldest_id, _)) = self
             .entries
