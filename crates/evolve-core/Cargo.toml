@@ -16,5 +16,13 @@ hex.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+# Optional: GG-CORE for real ONNX embeddings
+gg-core = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+
+[features]
+default = []
+ggcore = ["gg-core", "async-trait"]
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

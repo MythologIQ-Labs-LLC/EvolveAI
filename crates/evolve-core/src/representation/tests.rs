@@ -112,3 +112,15 @@ async fn test_mock_engine_serialization_roundtrip() {
     let deserialized = engine.deserialize(&serialized).unwrap();
     assert_eq!(rep.as_vector(), deserialized.as_vector());
 }
+
+#[test]
+fn test_create_mock_engine_via_factory() {
+    let engine = crate::representation::factory::create_mock_engine(256);
+    assert_eq!(engine.model_id(), "mock-engine");
+}
+
+#[test]
+fn test_engine_type_default() {
+    let engine_type = crate::representation::factory::EngineType::default();
+    assert!(matches!(engine_type, crate::representation::factory::EngineType::Mock { dimensions: 384 }));
+}

@@ -1,7 +1,7 @@
 # AUDIT REPORT
 
-**Tribunal Date**: 2026-03-18T06:00:00Z
-**Target**: v3.4 Lifecycle Orchestrator - 5-Phase Metabolic State Machine
+**Tribunal Date**: 2026-03-18T07:15:00Z
+**Target**: v3.5 GG-CORE Integration - ONNX Embedding Adapter
 **Risk Grade**: L3
 **Auditor**: The QoreLogic Judge
 
@@ -13,27 +13,27 @@
 
 ### Executive Summary
 
-The v3.4 Lifecycle Orchestrator plan passes all six audit criteria. The plan introduces a standalone state machine module with explicit phase transitions, fiber budget tracking, and pipeline trace accumulation. Zero new dependencies. The orchestrator has no imports from other evolve-core modules — it is fully self-contained. All proposed code is well within Section 4 limits.
+The v3.5 GG-CORE Integration plan passes all six audit criteria. The plan adds a feature-gated adapter wrapping GG-CORE's OnnxEmbedder behind the existing RepresentationEngine trait. Two new optional dependencies (gg-core, async-trait) are justified and gated behind the `ggcore` feature. The default build is unaffected. No GG-CORE types leak beyond the adapter module.
 
 ### Audit Results
 
 #### Security Pass
-**Result**: PASS — State machine with no auth, network, or I/O surface.
+**Result**: PASS — Adapter wraps external crate. No auth, no secrets.
 
 #### Ghost UI Pass
-**Result**: PASS — Backend library only.
+**Result**: PASS — Backend library.
 
 #### Section 4 Razor Pass
-**Result**: PASS — Max ~130 lines/file, max ~15 lines/function, nesting 1.
+**Result**: PASS — Max ~110 lines/file, max ~15 lines/function.
 
 #### Dependency Pass
-**Result**: PASS — Zero new dependencies. Uses only serde + thiserror (already in workspace).
+**Result**: PASS — gg-core and async-trait are optional, feature-gated. Justified.
 
 #### Macro-Level Architecture Pass
-**Result**: PASS — lifecycle/ has zero imports from other evolve-core modules. Processor imports lifecycle (one-way).
+**Result**: PASS — GG-CORE types contained in adapter. No leakage.
 
 #### Orphan Pass
-**Result**: PASS — All files connected via lib.rs → lifecycle/mod.rs.
+**Result**: PASS — Conditionally compiled via `#[cfg(feature = "ggcore")]`.
 
 ### Violations Found
 

@@ -12,3 +12,5 @@ sha2 = "0.10"
 hex = "0.4"
 thiserror = "1"
 tracing = "0.1"
+async-trait = "0.1"
+gg-core = { path = "G:/mythologiq/GG/GG-CORE/core-runtime" }

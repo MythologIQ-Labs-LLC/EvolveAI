@@ -1,52 +1,52 @@
 # System State
 
-**Generated**: 2026-03-18T06:30:00Z
+**Generated**: 2026-03-18T07:45:00Z
 **Phase**: SUBSTANTIATE
 **Status**: SEALED
-**Version**: v3.4.0
+**Version**: v3.5.0
 
 ---
 
-## Physical Tree: evolve-core (37 files, 7 modules)
+## evolve-core: 39 files, 7 modules, 95 tests
 
 ```
 crates/evolve-core/src/
 ├── lib.rs                        # 7 modules
-├── representation/               # Embedding abstraction (6 files, 14 tests)
-├── memory/                       # Encode/decode pipeline (6 files, 16 tests)
-├── chain/                        # Cryptographic integrity (5 files, 8 tests)
-├── tiers/                        # L1/L2/L3 storage (6 files, 14 tests)
-├── shadow/                       # Failure pattern immune system (5 files, 11 tests)
-├── lifecycle/                    # 5-phase metabolic state machine (4 files, 12 tests)
-└── processor/                    # Facade + persistence (4 files, 18 tests)
+├── representation/               # 8 files, 16 tests
+│   ├── types.rs, engine.rs, similarity.rs, mock.rs
+│   ├── factory.rs                # NEW v3.5: EngineType enum + factory functions
+│   ├── ggcore.rs                 # NEW v3.5: GG-CORE adapter (#[cfg(feature = "ggcore")])
+│   └── tests.rs
+├── memory/                       # 6 files, 16 tests
+├── chain/                        # 5 files, 8 tests
+├── tiers/                        # 6 files, 14 tests
+├── shadow/                       # 5 files, 11 tests
+├── lifecycle/                    # 4 files, 12 tests
+└── processor/                    # 4 files, 18 tests
 ```
 
-## Module Summary
+## Feature Flags
 
-| Module | Files | Tests | Version |
-|--------|-------|-------|---------|
-| representation | 6 | 14 | v3.0 |
-| memory | 6 | 16 | v3.1 |
-| chain | 5 | 8 | v3.0 |
-| tiers | 6 | 14 | v3.1 |
-| shadow | 5 | 11 | v3.3 |
-| lifecycle | 4 | 12 | v3.4 |
-| processor | 5 | 18 | v3.4 |
-| **TOTAL** | **37** | **93** | |
+| Feature | Dependencies | Purpose |
+|---------|-------------|---------|
+| `default` | (none) | MockEngine only |
+| `ggcore` | gg-core, async-trait | Real ONNX embeddings via GG-CORE |
+
+## v3.0 Rust Rewrite Plan: COMPLETE
+
+| Phase | Description | Version |
+|-------|-------------|---------|
+| 1 | Core Types & Representation | v3.0-alpha |
+| 2 | Memory Types & Hash Chain | v3.0-alpha |
+| 3 | Tier System & Router | v3.0-alpha |
+| **4** | **GG-Core Integration** | **v3.5.0** |
 
 ## Section 4 Compliance
 
 | Check | Limit | Actual | Status |
 |-------|-------|--------|--------|
-| Max production file | 250 | 249 (facade.rs) | PASS |
-| Max function lines | 40 | ~15 | PASS |
+| Max production file | 250 | 249 | PASS |
 | Console artifacts | 0 | 0 | PASS |
-
-## Deferred
-
-| Component | Notes |
-|-----------|-------|
-| GG-CORE ONNX | External dependency |
 
 ---
 

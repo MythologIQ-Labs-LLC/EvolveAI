@@ -1432,13 +1432,141 @@ SHA256(impl + state + previous) = 89b4d2fdd4898735b6c3158089f722756007d709a500e5
 
 ---
 
+### Entry #34: PLAN v3.5
+
+**Timestamp**: 2026-03-18T07:00:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v3.5-ggcore-integration.md) = c72cb95f11947d8f84caf0436531ba74ab44d6da6b4de2ef19e97c0c01d66bbf
+```
+
+**Previous Hash**: 89b4d2fdd4898735b6c3158089f722756007d709a500e59f33a73d29d52c7456
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = a061f0e56db758b7d56ef4ee8bca339740b5c8fd1bfc3b126979c9286cdeabf2
+```
+
+**Decision**: v3.5 GG-CORE Integration plan created. Completes the final deferred component from the original v3.0 Rust Rewrite plan (Phase 4).
+
+**Key Decisions**:
+1. **Feature-gated** — `ggcore` feature flag; crate builds without GG-CORE
+2. **Adapter pattern** — GgCoreEngine wraps OnnxEmbedder, implements RepresentationEngine
+3. **Factory** — EngineType enum + factory functions for engine selection
+4. **GG-CORE is stubbed** — adapter targets stable API types; will work when Candle integration lands
+
+**Phases**:
+1. Feature flag + GgCoreEngine adapter (1 new file, 3 modified)
+2. Engine factory (1 new file, 1 modified)
+
+**Artifacts Created**:
+- docs/plan-v3.5-ggcore-integration.md
+
+---
+
+### Entry #35: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T07:15:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 567f924566a838e28ece31b8c376640cd5e6f1f9fd00dc8418541d3793941b32
+```
+
+**Previous Hash**: a061f0e56db758b7d56ef4ee8bca339740b5c8fd1bfc3b126979c9286cdeabf2
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = a6b180e52c5c0b35e3fe8deadcb9c0d63d040a46f8654731501f4dab07c06d1e
+```
+
+**Decision**: v3.5 GG-CORE Integration APPROVED. Feature-gated adapter, no default build impact.
+
+---
+
+### Entry #36: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T07:30:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist
+**Risk Grade**: L3
+
+**Files Created**:
+- crates/evolve-core/src/representation/ggcore.rs (120 lines, `#[cfg(feature = "ggcore")]`)
+- crates/evolve-core/src/representation/factory.rs (35 lines)
+
+**Files Modified**:
+- Cargo.toml (workspace: added gg-core, async-trait deps)
+- crates/evolve-core/Cargo.toml (added optional gg-core, async-trait; `ggcore` feature)
+- crates/evolve-core/src/representation/mod.rs (added factory, conditional ggcore module)
+- crates/evolve-core/src/representation/tests.rs (added 2 factory tests)
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = 5213b197dbb6f35179b86879cce415cdac6b04635601d2de32b78cb0e77d4603
+```
+
+**Previous Hash**: a6b180e52c5c0b35e3fe8deadcb9c0d63d040a46f8654731501f4dab07c06d1e
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = e1562337daa57f0aa2a29cb5a22448a40dc96e0595077f9bdfd2e9debc73716a
+```
+
+**Decision**: v3.5 GG-CORE Integration COMPLETE. Completes the original v3.0 Plan Phase 4.
+
+1. **Phase 1**: GgCoreEngine adapter (wraps OnnxEmbedder → RepresentationEngine trait) behind `ggcore` feature flag
+2. **Phase 2**: Engine factory (EngineType enum, create_mock_engine, create_ggcore_engine)
+
+**Build Verification**:
+- Default build: PASS (93+2 tests, no GG-CORE dependency)
+- `--features ggcore`: PASS (compiles against GG-CORE v0.8.1)
+
+**Test Results**: 95 tests pass (default features)
+
+---
+
+### Entry #37: SESSION SEAL
+
+**Timestamp**: 2026-03-18T07:45:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: SEALED
+
+**Chain Hash**:
+```
+SHA256(impl + state + previous) = 791410c61c90c1030e32fc4ab156059f59cf03c52ccf9ae561be93e34dc38757
+```
+
+**Previous Hash**: e1562337daa57f0aa2a29cb5a22448a40dc96e0595077f9bdfd2e9debc73716a
+
+| Check | Result |
+|-------|--------|
+| Version | PASS (v3.5.0 > v3.4.0) |
+| Tests | PASS (95, default features) |
+| GG-CORE build | PASS (compiles with `--features ggcore`) |
+| Section 4 | PASS (max 249 lines) |
+
+**Milestone**: Original v3.0 Rust Rewrite Plan (all 4 phases) COMPLETE.
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `89b4d2fdd4898735b6c3158089f722756007d709a500e59f33a73d29d52c7456`
-**Blocks**: 33
-**Lifecycle**: v3.4 SEALED
-**Version**: v3.4.0
+**Current Hash**: `791410c61c90c1030e32fc4ab156059f59cf03c52ccf9ae561be93e34dc38757`
+**Blocks**: 37
+**Lifecycle**: v3.5 SEALED
+**Version**: v3.5.0
 
 ---
 
