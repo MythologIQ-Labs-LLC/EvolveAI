@@ -1718,11 +1718,39 @@ SHA256(content_hash + previous_hash) = 05fe06638c74d47cd70e4ca0467d91bbe660deeb7
 
 ## Chain Status: ACTIVE
 
+### Entry #43: PLAN v5.0
+
+**Timestamp**: 2026-03-18T10:30:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v5.0-uor-identity.md) = 5437601aad048d1ebaa332a1591e9851d78a6c5003be361da02d084f64a9bb3b
+```
+
+**Previous Hash**: 05fe06638c74d47cd70e4ca0467d91bbe660deeb73bf27de9992655bcc8bd960
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 2e9ca84099840bc40a7f2eff1b545276db5b07cbd66f2e4baa422260383dfb64
+```
+
+**Decision**: v5.0 UOR Identity & Thermodynamic Decay plan created. Three phases: (1) BLAKE3 content-addressed identity replacing UUID, (2) saturation-driven decay (λ_eff = λ_base × T_ctx), (3) L3 O(1) address lookup. Validates 6 theoretical claims from the CMHL×UOR convergence research.
+
+**Artifacts Created**:
+- docs/plan-v5.0-uor-identity.md
+
+---
+
+## Chain Status: ACTIVE
+
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `05fe06638c74d47cd70e4ca0467d91bbe660deeb73bf27de9992655bcc8bd960`
-**Blocks**: 42
-**Lifecycle**: RESEARCH PHASE (v5.0 architecture synthesis)
-**Version**: v4.0.0
+**Current Hash**: `2e9ca84099840bc40a7f2eff1b545276db5b07cbd66f2e4baa422260383dfb64`
+**Blocks**: 43
+**Lifecycle**: v5.0 PLANNED
+**Version**: v5.0.0 (pending audit + implementation)
 
 ---
 
