@@ -15,6 +15,7 @@ sha2.workspace = true
 hex.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+blake3.workspace = true
 
 # Optional: GG-CORE for real ONNX embeddings
 gg-core = { workspace = true, optional = true }

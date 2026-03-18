@@ -1,19 +1,19 @@
-use crate::memory::types::{MemoryUnit, UorId};
+use crate::memory::types::{MemoryUnit, UorAddress};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A weighted, timestamped edge between two memory nodes.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Edge {
-    pub target: UorId,
+    pub target: UorAddress,
     pub weight: f32,
     pub created_at: i64,
 }
 
 /// L2 Temporal Graph -- associative memory with weighted edges.
 pub struct L2Graph {
-    nodes: HashMap<UorId, MemoryUnit>,
-    edges: HashMap<UorId, Vec<Edge>>,
+    nodes: HashMap<UorAddress, MemoryUnit>,
+    edges: HashMap<UorAddress, Vec<Edge>>,
 }
 
 impl L2Graph {
@@ -27,37 +27,33 @@ impl L2Graph {
 
     /// Insert a memory node into the graph.
     pub fn insert(&mut self, unit: MemoryUnit) {
-        let id = unit.uor_id;
-        self.nodes.insert(id, unit);
-        self.edges.entry(id).or_default();
+        let addr = unit.address.clone();
+        self.nodes.insert(addr.clone(), unit);
+        self.edges.entry(addr).or_default();
     }
 
     /// Add an edge between two existing nodes.
-    pub fn add_edge(&mut self, from: UorId, to: UorId, weight: f32, now: i64) {
+    pub fn add_edge(&mut self, from: UorAddress, to: UorAddress, weight: f32, now: i64) {
         if !self.nodes.contains_key(&from) || !self.nodes.contains_key(&to) {
             return;
         }
         let edges = self.edges.entry(from).or_default();
-        edges.push(Edge {
-            target: to,
-            weight,
-            created_at: now,
-        });
+        edges.push(Edge { target: to, weight, created_at: now });
     }
 
-    /// Get a node by ID.
-    pub fn get(&self, id: &UorId) -> Option<&MemoryUnit> {
-        self.nodes.get(id)
+    /// Get a node by address.
+    pub fn get(&self, addr: &UorAddress) -> Option<&MemoryUnit> {
+        self.nodes.get(addr)
     }
 
     /// Get outgoing edges from a node.
-    pub fn edges_from(&self, id: &UorId) -> &[Edge] {
-        self.edges.get(id).map_or(&[], Vec::as_slice)
+    pub fn edges_from(&self, addr: &UorAddress) -> &[Edge] {
+        self.edges.get(addr).map_or(&[], Vec::as_slice)
     }
 
     /// Get direct neighbors of a node (depth 1).
-    pub fn neighbors(&self, id: &UorId) -> Vec<&MemoryUnit> {
-        self.edges_from(id)
+    pub fn neighbors(&self, addr: &UorAddress) -> Vec<&MemoryUnit> {
+        self.edges_from(addr)
             .iter()
             .filter_map(|edge| self.nodes.get(&edge.target))
             .collect()
@@ -79,12 +75,12 @@ impl L2Graph {
     }
 
     /// Remove a node and all edges referencing it.
-    pub fn remove(&mut self, id: &UorId) -> Option<MemoryUnit> {
-        self.edges.remove(id);
+    pub fn remove(&mut self, addr: &UorAddress) -> Option<MemoryUnit> {
+        self.edges.remove(addr);
         for edges in self.edges.values_mut() {
-            edges.retain(|e| e.target != *id);
+            edges.retain(|e| e.target != *addr);
         }
-        self.nodes.remove(id)
+        self.nodes.remove(addr)
     }
 
     /// Get all nodes as a vec (for snapshotting).
@@ -93,13 +89,13 @@ impl L2Graph {
     }
 
     /// Get edges map reference (for snapshotting).
-    pub fn edges_map(&self) -> &HashMap<UorId, Vec<Edge>> {
+    pub fn edges_map(&self) -> &HashMap<UorAddress, Vec<Edge>> {
         &self.edges
     }
 
     /// Reconstruct from parts.
-    pub fn from_parts(nodes: Vec<MemoryUnit>, edges: HashMap<UorId, Vec<Edge>>) -> Self {
-        let node_map = nodes.into_iter().map(|u| (u.uor_id, u)).collect();
+    pub fn from_parts(nodes: Vec<MemoryUnit>, edges: HashMap<UorAddress, Vec<Edge>>) -> Self {
+        let node_map = nodes.into_iter().map(|u| (u.address.clone(), u)).collect();
         Self { nodes: node_map, edges }
     }
 }

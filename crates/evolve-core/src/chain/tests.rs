@@ -58,8 +58,39 @@ fn test_ledger_chain_integrity() {
 }
 
 #[test]
-fn test_content_hash_deterministic() {
+fn test_content_hash_sha256_deterministic() {
     let h1 = content_hash(b"some bytes");
     let h2 = content_hash(b"some bytes");
     assert_eq!(h1, h2);
+}
+
+// --- BLAKE3 tests (v5.0) ---
+
+#[test]
+fn test_blake3_deterministic() {
+    let h1 = blake3_hash(b"test");
+    let h2 = blake3_hash(b"test");
+    assert_eq!(h1, h2);
+    assert_eq!(h1.len(), 64); // hex-encoded BLAKE3
+}
+
+#[test]
+fn test_blake3_different_inputs() {
+    let h1 = blake3_hash(b"hello");
+    let h2 = blake3_hash(b"world");
+    assert_ne!(h1, h2);
+}
+
+#[test]
+fn test_content_address_deterministic() {
+    let a1 = content_address("same content");
+    let a2 = content_address("same content");
+    assert_eq!(a1, a2);
+}
+
+#[test]
+fn test_content_address_different_inputs() {
+    let a1 = content_address("alpha");
+    let a2 = content_address("beta");
+    assert_ne!(a1, a2);
 }

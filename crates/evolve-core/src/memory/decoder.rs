@@ -31,7 +31,7 @@ fn score_unit(
         unit.last_accessed,
         now,
         config.half_life_ms,
-        unit.decay_factor,
+        unit.saturation,
     );
 
     if should_prune(decayed_weight, config.decay_threshold) {

@@ -1,16 +1,14 @@
 use super::*;
-use crate::memory::types::{MemoryUnit, Tier, UnitMetadata};
-use uuid::Uuid;
+use crate::memory::types::{MemoryUnit, Tier, UnitMetadata, UorAddress};
 
-fn make_unit(tags: Vec<&str>, embedding_len: usize) -> MemoryUnit {
+fn make_unit(content: &str, tags: Vec<&str>, embedding_len: usize) -> MemoryUnit {
     MemoryUnit {
-        uor_id: Uuid::new_v4(),
+        address: UorAddress::from_content(content),
         embedding: vec![0.0; embedding_len],
-        content_hash: "test-hash".into(),
         created_at: 1000,
         last_accessed: 1000,
         access_count: 0,
-        decay_factor: 1.0,
+        saturation: 0.0,
         metadata: UnitMetadata {
             tags: tags.into_iter().map(String::from).collect(),
             source: None,
@@ -22,7 +20,7 @@ fn make_unit(tags: Vec<&str>, embedding_len: usize) -> MemoryUnit {
 
 #[test]
 fn test_route_sensitive_to_l3() {
-    let unit = make_unit(vec!["sensitive"], 384);
+    let unit = make_unit("sensitive-data", vec!["sensitive"], 384);
     let decision = route_memory_unit(
         &unit,
         &MtsWeights::default(),
@@ -33,7 +31,7 @@ fn test_route_sensitive_to_l3() {
 
 #[test]
 fn test_route_standard_to_l2() {
-    let unit = make_unit(vec![], 384);
+    let unit = make_unit("normal-data", vec![], 384);
     let decision = route_memory_unit(
         &unit,
         &MtsWeights::default(),
@@ -44,7 +42,7 @@ fn test_route_standard_to_l2() {
 
 #[test]
 fn test_route_with_custom_thresholds() {
-    let unit = make_unit(vec![], 10);
+    let unit = make_unit("small-data", vec![], 10);
     let thresholds = TierThresholds { l3: 0.9, l2: 0.5 };
     let decision = route_memory_unit(
         &unit,
@@ -56,7 +54,7 @@ fn test_route_with_custom_thresholds() {
 
 #[test]
 fn test_mts_score_calculation() {
-    let unit = make_unit(vec!["sensitive"], 1000);
+    let unit = make_unit("scored-data", vec!["sensitive"], 1000);
     let decision = route_memory_unit(
         &unit,
         &MtsWeights::default(),
@@ -69,64 +67,73 @@ fn test_mts_score_calculation() {
 }
 
 #[test]
+fn test_crystallized_memory_routes_to_l3() {
+    let mut unit = make_unit("crystallized", vec![], 32);
+    unit.saturation = 0.96;
+    let decision = route_memory_unit(
+        &unit,
+        &MtsWeights::default(),
+        &TierThresholds::default(),
+    );
+    assert_eq!(decision.tier, Tier::L3);
+}
+
+#[test]
 fn test_l1_cache_insert_and_get() {
     let mut cache = l1_cache::L1Cache::new(60000, 100);
-    let unit = make_unit(vec![], 32);
-    let id = unit.uor_id;
+    let unit = make_unit("cached", vec![], 32);
+    let addr = unit.address.clone();
     cache.insert(unit, 1000);
-    assert!(cache.get(&id, 1000).is_some());
+    assert!(cache.get(&addr, 1000).is_some());
 }
 
 #[test]
 fn test_l1_cache_ttl_expiry() {
     let mut cache = l1_cache::L1Cache::new(1000, 100);
-    let unit = make_unit(vec![], 32);
-    let id = unit.uor_id;
+    let unit = make_unit("expiring", vec![], 32);
+    let addr = unit.address.clone();
     cache.insert(unit, 0);
-    assert!(cache.get(&id, 2000).is_none());
+    assert!(cache.get(&addr, 2000).is_none());
 }
 
 #[test]
 fn test_l1_cache_max_size_eviction() {
     let mut cache = l1_cache::L1Cache::new(60000, 2);
-    let u1 = make_unit(vec![], 32);
-    let u2 = make_unit(vec![], 32);
-    let u3 = make_unit(vec![], 32);
-    cache.insert(u1, 1000);
-    cache.insert(u2, 2000);
-    cache.insert(u3, 3000);
+    cache.insert(make_unit("a", vec![], 32), 1000);
+    cache.insert(make_unit("b", vec![], 32), 2000);
+    cache.insert(make_unit("c", vec![], 32), 3000);
     assert_eq!(cache.len(), 2);
 }
 
 #[test]
 fn test_l2_graph_insert_and_edge() {
     let mut graph = l2_graph::L2Graph::new();
-    let u1 = make_unit(vec![], 32);
-    let u2 = make_unit(vec![], 32);
-    let id1 = u1.uor_id;
-    let id2 = u2.uor_id;
+    let u1 = make_unit("node1", vec![], 32);
+    let u2 = make_unit("node2", vec![], 32);
+    let a1 = u1.address.clone();
+    let a2 = u2.address.clone();
     graph.insert(u1);
     graph.insert(u2);
-    graph.add_edge(id1, id2, 0.9, 1000);
+    graph.add_edge(a1.clone(), a2, 0.9, 1000);
     assert_eq!(graph.node_count(), 2);
     assert_eq!(graph.edge_count(), 1);
-    assert_eq!(graph.neighbors(&id1).len(), 1);
+    assert_eq!(graph.neighbors(&a1).len(), 1);
 }
 
 #[test]
 fn test_l2_graph_remove() {
     let mut graph = l2_graph::L2Graph::new();
-    let unit = make_unit(vec![], 32);
-    let id = unit.uor_id;
+    let unit = make_unit("removable", vec![], 32);
+    let addr = unit.address.clone();
     graph.insert(unit);
-    assert!(graph.remove(&id).is_some());
+    assert!(graph.remove(&addr).is_some());
     assert_eq!(graph.node_count(), 0);
 }
 
 #[test]
 fn test_l3_vault_store_and_verify() {
     let mut vault = l3_vault::L3Vault::new();
-    let unit = make_unit(vec!["sensitive"], 64);
+    let unit = make_unit("vault-data", vec!["sensitive"], 64);
     vault.store(unit);
     assert_eq!(vault.len(), 1);
     assert!(vault.verify_integrity());
@@ -135,20 +142,34 @@ fn test_l3_vault_store_and_verify() {
 #[test]
 fn test_l3_vault_chain_grows() {
     let mut vault = l3_vault::L3Vault::new();
-    vault.store(make_unit(vec![], 32));
-    vault.store(make_unit(vec![], 32));
+    vault.store(make_unit("v1", vec![], 32));
+    vault.store(make_unit("v2", vec![], 32));
     // genesis + 2 appends = 3 blocks
     assert_eq!(vault.ledger().len(), 3);
 }
 
 #[test]
+fn test_l3_vault_get_by_address() {
+    let mut vault = l3_vault::L3Vault::new();
+    let unit = make_unit("addressable", vec![], 32);
+    let addr = unit.address.clone();
+    vault.store(unit);
+    assert!(vault.get_by_address(&addr).is_some());
+}
+
+#[test]
+fn test_l3_vault_address_miss() {
+    let vault = l3_vault::L3Vault::new();
+    let addr = UorAddress::from_content("nonexistent");
+    assert!(vault.get_by_address(&addr).is_none());
+}
+
+#[test]
 fn test_l1_cache_iter_units_excludes_expired() {
     let mut cache = l1_cache::L1Cache::new(1000, 100);
-    let u1 = make_unit(vec![], 32);
-    let u2 = make_unit(vec![], 32);
-    cache.insert(u1, 0);
-    cache.insert(u2, 500);
-    // At now=1200, u1 (inserted at 0) is expired, u2 (inserted at 500) is still valid
+    cache.insert(make_unit("early", vec![], 32), 0);
+    cache.insert(make_unit("later", vec![], 32), 500);
+    // At now=1200, first (inserted at 0) is expired, second (inserted at 500) is still valid
     let count = cache.iter_units(1200).count();
     assert_eq!(count, 1);
 }
@@ -156,16 +177,16 @@ fn test_l1_cache_iter_units_excludes_expired() {
 #[test]
 fn test_l2_graph_iter_units() {
     let mut graph = l2_graph::L2Graph::new();
-    graph.insert(make_unit(vec![], 32));
-    graph.insert(make_unit(vec![], 32));
-    graph.insert(make_unit(vec![], 32));
+    graph.insert(make_unit("g1", vec![], 32));
+    graph.insert(make_unit("g2", vec![], 32));
+    graph.insert(make_unit("g3", vec![], 32));
     assert_eq!(graph.iter_units().count(), 3);
 }
 
 #[test]
 fn test_l3_vault_iter_units() {
     let mut vault = l3_vault::L3Vault::new();
-    vault.store(make_unit(vec![], 32));
-    vault.store(make_unit(vec![], 32));
+    vault.store(make_unit("vi1", vec![], 32));
+    vault.store(make_unit("vi2", vec![], 32));
     assert_eq!(vault.iter_units().count(), 2);
 }

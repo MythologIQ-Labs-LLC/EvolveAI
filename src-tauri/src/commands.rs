@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 
 #[derive(Serialize)]
 pub struct EncodeResponse {
-    pub uor_id: String,
+    pub address: String,
     pub tier: String,
     pub mts_score: f32,
 }
@@ -57,7 +57,7 @@ pub async fn encode_memory(
     let mut proc = processor.lock().await;
     let result = proc.encode(&input, now).await.map_err(|e| e.to_string())?;
     Ok(EncodeResponse {
-        uor_id: result.unit.uor_id.to_string(),
+        address: result.unit.address.to_string(),
         tier: format!("{:?}", result.decision.tier),
         mts_score: result.decision.mts_score,
     })

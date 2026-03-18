@@ -1,4 +1,5 @@
-use evolve_core::processor::facade::{MemoryProcessor, ProcessorConfig};
+use evolve_core::processor::facade::MemoryProcessor;
+use evolve_core::processor::types::ProcessorConfig;
 use evolve_core::representation::mock::MockEngine;
 use tokio::sync::Mutex;
 

@@ -18,9 +18,19 @@ pub fn compute_block_hash(
     sha256(&input)
 }
 
-/// Compute a content hash from raw bytes.
+/// Compute a content hash from raw bytes (SHA-256).
 pub fn content_hash(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hex::encode(hasher.finalize())
+}
+
+/// Compute BLAKE3 hash, returned as lowercase hex.
+pub fn blake3_hash(data: &[u8]) -> String {
+    blake3::hash(data).to_hex().to_string()
+}
+
+/// Compute UOR content address from string content (BLAKE3).
+pub fn content_address(content: &str) -> String {
+    blake3_hash(content.as_bytes())
 }

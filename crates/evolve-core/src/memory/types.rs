@@ -1,8 +1,25 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-/// Universal Object Reference - unique memory identifier.
-pub type UorId = Uuid;
+/// Content-addressed memory identifier (BLAKE3 hex digest).
+/// Two memories with identical content produce identical addresses.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct UorAddress(pub String);
+
+impl UorAddress {
+    pub fn from_content(content: &str) -> Self {
+        Self(crate::chain::hash::content_address(content))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for UorAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Raw input before encoding.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,13 +70,12 @@ pub enum Sensitivity {
 /// Encoded memory unit stored in the tier system.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryUnit {
-    pub uor_id: UorId,
+    pub address: UorAddress,
     pub embedding: Vec<f32>,
-    pub content_hash: String,
     pub created_at: i64,
     pub last_accessed: i64,
     pub access_count: u32,
-    pub decay_factor: f32,
+    pub saturation: f32,
     pub metadata: UnitMetadata,
 }
 

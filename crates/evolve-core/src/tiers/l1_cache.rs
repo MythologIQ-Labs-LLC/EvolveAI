@@ -1,9 +1,9 @@
-use crate::memory::types::{MemoryUnit, UorId};
+use crate::memory::types::{MemoryUnit, UorAddress};
 use std::collections::HashMap;
 
 /// L1 Transient Cache -- ephemeral memory with TTL eviction.
 pub struct L1Cache {
-    entries: HashMap<UorId, CacheEntry>,
+    entries: HashMap<UorAddress, CacheEntry>,
     ttl_ms: i64,
     max_size: usize,
 }
@@ -29,13 +29,13 @@ impl L1Cache {
         if self.entries.len() >= self.max_size {
             self.evict_oldest();
         }
-        let id = unit.uor_id;
-        self.entries.insert(id, CacheEntry { unit, inserted_at: now });
+        let addr = unit.address.clone();
+        self.entries.insert(addr, CacheEntry { unit, inserted_at: now });
     }
 
-    /// Retrieve a memory unit by ID, returning `None` if expired.
-    pub fn get(&self, id: &UorId, now: i64) -> Option<&MemoryUnit> {
-        let entry = self.entries.get(id)?;
+    /// Retrieve a memory unit by address, returning `None` if expired.
+    pub fn get(&self, addr: &UorAddress, now: i64) -> Option<&MemoryUnit> {
+        let entry = self.entries.get(addr)?;
         if now - entry.inserted_at > self.ttl_ms {
             return None;
         }
@@ -67,12 +67,13 @@ impl L1Cache {
     }
 
     fn evict_oldest(&mut self) {
-        if let Some((&oldest_id, _)) = self
+        if let Some(oldest_key) = self
             .entries
             .iter()
             .min_by_key(|(_, e)| e.inserted_at)
+            .map(|(k, _)| k.clone())
         {
-            self.entries.remove(&oldest_id);
+            self.entries.remove(&oldest_key);
         }
     }
 }

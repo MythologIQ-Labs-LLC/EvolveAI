@@ -1,11 +1,11 @@
 use crate::chain::hash;
 use crate::chain::ledger::Ledger;
-use crate::memory::types::{MemoryUnit, UorId};
+use crate::memory::types::{MemoryUnit, UorAddress};
 use std::collections::HashMap;
 
 /// L3 UOR Vault -- immutable memory with cryptographic integrity.
 pub struct L3Vault {
-    entries: HashMap<UorId, MemoryUnit>,
+    entries: HashMap<UorAddress, MemoryUnit>,
     ledger: Ledger,
 }
 
@@ -23,12 +23,17 @@ impl L3Vault {
         let data = serde_json::to_vec(&unit).expect("MemoryUnit serialization cannot fail");
         let data_hash = hash::content_hash(&data);
         self.ledger.append(data_hash);
-        self.entries.insert(unit.uor_id, unit);
+        self.entries.insert(unit.address.clone(), unit);
     }
 
-    /// Retrieve a memory unit by ID.
-    pub fn get(&self, id: &UorId) -> Option<&MemoryUnit> {
-        self.entries.get(id)
+    /// O(1) lookup by content address.
+    pub fn get_by_address(&self, addr: &UorAddress) -> Option<&MemoryUnit> {
+        self.entries.get(addr)
+    }
+
+    /// Retrieve a memory unit by address.
+    pub fn get(&self, addr: &UorAddress) -> Option<&MemoryUnit> {
+        self.entries.get(addr)
     }
 
     /// Iterate over all stored units.
@@ -63,7 +68,7 @@ impl L3Vault {
 
     /// Reconstruct from parts (entries + ledger).
     pub fn from_parts(entries: Vec<MemoryUnit>, ledger: Ledger) -> Self {
-        let entry_map = entries.into_iter().map(|u| (u.uor_id, u)).collect();
+        let entry_map = entries.into_iter().map(|u| (u.address.clone(), u)).collect();
         Self { entries: entry_map, ledger }
     }
 }

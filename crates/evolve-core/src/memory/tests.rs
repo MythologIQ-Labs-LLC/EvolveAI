@@ -16,18 +16,19 @@ fn make_raw_input(content: &str, tags: Vec<&str>) -> RawInput {
     }
 }
 
-fn make_unit_with_embedding(embedding: Vec<f32>, last_accessed: i64, decay: f32) -> MemoryUnit {
+fn make_unit_with_embedding(content: &str, embedding: Vec<f32>, last_accessed: i64, saturation: f32) -> MemoryUnit {
     MemoryUnit {
-        uor_id: uuid::Uuid::new_v4(),
+        address: UorAddress::from_content(content),
         embedding,
-        content_hash: "test".into(),
         created_at: 0,
         last_accessed,
         access_count: 0,
-        decay_factor: decay,
+        saturation,
         metadata: UnitMetadata::default(),
     }
 }
+
+// --- Encoder tests ---
 
 #[tokio::test]
 async fn test_encode_produces_valid_unit() {
@@ -36,7 +37,6 @@ async fn test_encode_produces_valid_unit() {
     let config = EncoderConfig::default();
     let unit = encoder::encode(&input, &engine, &config, 1000).await.unwrap();
     assert_eq!(unit.embedding.len(), 32);
-    assert!(!unit.content_hash.is_empty());
     assert_eq!(unit.created_at, 1000);
 }
 
@@ -49,10 +49,44 @@ async fn test_encode_sensitive_routes_to_l3() {
     assert_eq!(unit.metadata.tier, Tier::L3);
 }
 
+#[tokio::test]
+async fn test_encode_produces_content_address() {
+    let engine = MockEngine::new(32);
+    let input = make_raw_input("deterministic content", vec![]);
+    let config = EncoderConfig::default();
+    let unit = encoder::encode(&input, &engine, &config, 1000).await.unwrap();
+    let expected = UorAddress::from_content("deterministic content");
+    assert_eq!(unit.address, expected);
+}
+
+// --- UorAddress tests ---
+
+#[test]
+fn test_uor_address_from_content() {
+    let addr = UorAddress::from_content("hello");
+    assert_eq!(addr.as_str().len(), 64);
+}
+
+#[test]
+fn test_uor_address_deduplicates() {
+    let a1 = UorAddress::from_content("same content");
+    let a2 = UorAddress::from_content("same content");
+    assert_eq!(a1, a2);
+}
+
+#[test]
+fn test_uor_address_different_content() {
+    let a1 = UorAddress::from_content("alpha");
+    let a2 = UorAddress::from_content("beta");
+    assert_ne!(a1, a2);
+}
+
+// --- Decoder tests ---
+
 #[test]
 fn test_decode_ranks_by_relevance() {
-    let u1 = make_unit_with_embedding(vec![1.0, 0.0, 0.0], 1000, 1.0);
-    let u2 = make_unit_with_embedding(vec![0.5, 0.5, 0.0], 1000, 1.0);
+    let u1 = make_unit_with_embedding("a", vec![1.0, 0.0, 0.0], 1000, 0.0);
+    let u2 = make_unit_with_embedding("b", vec![0.5, 0.5, 0.0], 1000, 0.0);
     let query_emb = vec![1.0, 0.0, 0.0];
     let config = DecoderConfig { top_k: 10, decay_threshold: 0.01, half_life_ms: 3_600_000 };
     let results = decoder::decode(&[&u1, &u2], &query_emb, 1000, &config);
@@ -62,10 +96,10 @@ fn test_decode_ranks_by_relevance() {
 
 #[test]
 fn test_decode_filters_decayed() {
-    let u = make_unit_with_embedding(vec![1.0, 0.0], 0, 1.0);
+    let u = make_unit_with_embedding("c", vec![1.0, 0.0], 0, 0.0);
     let query_emb = vec![1.0, 0.0];
     let config = DecoderConfig { top_k: 10, decay_threshold: 0.5, half_life_ms: 1000 };
-    // At now=5000, 5 half-lives passed: decay = 0.03125 < 0.5 threshold
+    // At now=5000, 5 half-lives passed: unsaturated memory decays fully
     let results = decoder::decode(&[&u], &query_emb, 5000, &config);
     assert!(results.is_empty());
 }
@@ -73,7 +107,7 @@ fn test_decode_filters_decayed() {
 #[test]
 fn test_decode_respects_top_k() {
     let units: Vec<MemoryUnit> = (0..20)
-        .map(|i| make_unit_with_embedding(vec![i as f32, 1.0], 1000, 1.0))
+        .map(|i| make_unit_with_embedding(&format!("u{i}"), vec![i as f32, 1.0], 1000, 0.0))
         .collect();
     let refs: Vec<&MemoryUnit> = units.iter().collect();
     let query_emb = vec![1.0, 0.0];
@@ -90,34 +124,83 @@ fn test_decode_empty_candidates() {
     assert!(results.is_empty());
 }
 
+// --- Decay tests (thermodynamic model) ---
+
 #[test]
 fn test_decay_no_time_elapsed() {
-    let result = calculate_decay(1000, 1000, 60000, 1.0);
+    let result = calculate_decay(1000, 1000, 60000, 0.0);
     assert!((result - 1.0).abs() < 1e-6);
 }
 
 #[test]
-fn test_decay_one_half_life() {
-    let result = calculate_decay(0, 60000, 60000, 1.0);
-    assert!((result - 0.5).abs() < 1e-6);
-}
-
-#[test]
-fn test_decay_two_half_lives() {
-    let result = calculate_decay(0, 120_000, 60000, 1.0);
-    assert!((result - 0.25).abs() < 1e-6);
+fn test_decay_one_half_life_unsaturated() {
+    // σ=0: T_ctx = ln(2), λ_eff = λ_base * ln(2) = ln(2)^2 / half_life
+    // At exactly one half-life: decay = e^(-λ_eff * half_life) = e^(-ln(2)^2)
+    let result = calculate_decay(0, 60000, 60000, 0.0);
+    let expected = (-std::f32::consts::LN_2 * std::f32::consts::LN_2).exp();
+    assert!((result - expected).abs() < 1e-4);
+    assert!(result < 1.0);
+    assert!(result > 0.0);
 }
 
 #[test]
 fn test_decay_negative_elapsed() {
-    let result = calculate_decay(2000, 1000, 60000, 0.8);
-    assert!((result - 0.8).abs() < 1e-6);
+    let result = calculate_decay(2000, 1000, 60000, 0.5);
+    assert!((result - 1.0).abs() < 1e-6);
 }
 
 #[test]
-fn test_decay_custom_base_factor() {
-    let result = calculate_decay(0, 60000, 60000, 0.5);
-    assert!((result - 0.25).abs() < 1e-6);
+fn test_temperature_at_zero_saturation() {
+    let t = temperature(0.0);
+    assert!((t - std::f32::consts::LN_2).abs() < 1e-6);
+}
+
+#[test]
+fn test_temperature_at_full_saturation() {
+    let t = temperature(1.0);
+    assert!(t.abs() < 1e-6);
+}
+
+#[test]
+fn test_decay_saturated_memory_no_decay() {
+    // σ=1: T_ctx = 0, λ_eff = 0, decay = e^0 = 1.0 regardless of time
+    let result = calculate_decay(0, 1_000_000, 1000, 1.0);
+    assert!((result - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_decay_unsaturated_memory_decays() {
+    // σ=0 should decay over time
+    let result = calculate_decay(0, 100_000, 1000, 0.0);
+    assert!(result < 0.01);
+}
+
+#[test]
+fn test_decay_half_saturated_moderate() {
+    let full_decay = calculate_decay(0, 60000, 60000, 0.0);
+    let half_decay = calculate_decay(0, 60000, 60000, 0.5);
+    // Half-saturated should decay slower than unsaturated
+    assert!(half_decay > full_decay);
+}
+
+#[test]
+fn test_effective_lambda_zero_at_saturation() {
+    let base = std::f32::consts::LN_2 / 60000.0;
+    let lambda = effective_lambda(base, 1.0);
+    assert!(lambda.abs() < 1e-10);
+}
+
+#[test]
+fn test_boost_saturation_increases() {
+    let boosted = boost_saturation(0.0, 10, 0.1);
+    assert!(boosted > 0.0);
+    assert!(boosted < 1.0);
+}
+
+#[test]
+fn test_boost_saturation_asymptotic() {
+    let boosted = boost_saturation(0.5, 1000, 1.0);
+    assert!((boosted - 1.0).abs() < 1e-4);
 }
 
 #[test]
@@ -128,26 +211,4 @@ fn test_should_prune_below_threshold() {
 #[test]
 fn test_should_not_prune_above_threshold() {
     assert!(!should_prune(0.5, 0.05));
-}
-
-#[test]
-fn test_effective_strength_boost() {
-    let result = effective_strength(0.5, 10, 0.1);
-    // boost = 1.0 + min(10 * 0.1, 2.0) = 2.0
-    // strength = min(0.5 * 2.0, 1.0) = 1.0
-    assert!((result - 1.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_effective_strength_clamped() {
-    let result = effective_strength(0.9, 100, 0.5);
-    // boost capped at 3.0, but result clamped to 1.0
-    assert!((result - 1.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_effective_strength_zero_access() {
-    let result = effective_strength(0.5, 0, 0.1);
-    // boost = 1.0, so result = 0.5
-    assert!((result - 0.5).abs() < 1e-6);
 }

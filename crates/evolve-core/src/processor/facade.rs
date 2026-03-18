@@ -1,47 +1,22 @@
 use crate::chain::ledger::Ledger;
-use crate::lifecycle::orchestrator::{LifecycleConfig, LifecycleError, Orchestrator};
+use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
-use crate::memory::decoder::{self, DecoderConfig};
-use crate::memory::encoder::{self, EncoderConfig};
+use crate::memory::decoder;
+use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::types::{
-    EncodeResult, PersistError, ProcessorStats, QueryResult, Snapshot, SNAPSHOT_VERSION,
+    EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
+    QueryResult, Snapshot, SNAPSHOT_VERSION, tier_list,
 };
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::shadow::genome::ShadowGenome;
-use crate::shadow::interceptor::{self, InterceptorConfig, Verdict};
+use crate::shadow::interceptor::{self, Verdict};
 use crate::shadow::types::FailureTrace;
 use crate::tiers::l1_cache::L1Cache;
 use crate::tiers::l2_graph::L2Graph;
 use crate::tiers::l3_vault::L3Vault;
 
-/// Configuration for the memory processor.
-#[derive(Clone, Debug)]
-pub struct ProcessorConfig {
-    pub encoder: EncoderConfig,
-    pub decoder: DecoderConfig,
-    pub interceptor: InterceptorConfig,
-    pub lifecycle: LifecycleConfig,
-    pub l1_ttl_ms: i64,
-    pub l1_max_size: usize,
-}
-
-impl Default for ProcessorConfig {
-    fn default() -> Self {
-        Self {
-            encoder: EncoderConfig::default(),
-            decoder: DecoderConfig::default(),
-            interceptor: InterceptorConfig::default(),
-            lifecycle: LifecycleConfig::default(),
-            l1_ttl_ms: 300_000,
-            l1_max_size: 1000,
-        }
-    }
-}
-
 /// Central facade for the autopoietic memory system.
-///
-/// Generic over `E` to avoid object-safety issues with RPITIT.
 pub struct MemoryProcessor<E: RepresentationEngine> {
     engine: E,
     config: ProcessorConfig,
@@ -70,12 +45,10 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         }
     }
 
-    /// Start a lifecycle session.
     pub fn start_session(&mut self, now: i64) -> Result<(), LifecycleError> {
         self.lifecycle.start_session(now)
     }
 
-    /// Get current lifecycle phase.
     pub fn phase(&self) -> Phase {
         self.lifecycle.phase()
     }
@@ -110,38 +83,18 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     ) -> Result<QueryResult, EngineError> {
         let start = std::time::Instant::now();
 
-        let rep = self.engine.encode(&query.content).await?;
-        let query_embedding = rep.as_vector();
+        // Fast path: L3 exact match by content address (skip if tier-restricted away from L3)
+        let allows_l3 = matches!(query.constraints.require_tier, None | Some(Tier::L3));
+        if allows_l3 {
+            if let Some(result) = self.try_l3_exact_match(&query.content, start) {
+                return Ok(result);
+            }
+        }
 
-        let candidates: Vec<&MemoryUnit> = self.collect_candidates(query, now);
-        let tiers_queried = tier_list(query.constraints.require_tier);
-        let total_candidates = candidates.len();
-
-        let memories = decoder::decode(
-            &candidates,
-            &query_embedding,
-            now,
-            &self.config.decoder,
-        );
-
-        let decay_filtered = total_candidates - memories.len();
-        let elapsed = start.elapsed().as_millis() as u64;
-
-        Ok(QueryResult {
-            recall: RecallResult {
-                memories,
-                metrics: RecallMetrics {
-                    latency_ms: elapsed,
-                    tiers_queried,
-                    candidates_evaluated: total_candidates,
-                    decay_filtered,
-                },
-            },
-            latency_ms: elapsed,
-        })
+        // Slow path: vector scan across tiers
+        self.vector_scan_query(query, now, start).await
     }
 
-    /// Get system statistics.
     pub fn stats(&self) -> ProcessorStats {
         ProcessorStats {
             l1_size: self.l1.len(),
@@ -155,19 +108,16 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         }
     }
 
-    /// Health check — verifies L3 chain integrity.
     pub fn health_check(&self) -> bool {
         self.l3.verify_integrity()
     }
 
-    /// Check intent safety against the shadow genome.
     pub async fn check_safety(&mut self, intent: &str) -> Result<Verdict, EngineError> {
         let rep = self.engine.encode(intent).await?;
         let embedding = rep.as_vector();
         Ok(interceptor::check_intent(&embedding, &mut self.shadow, &self.config.interceptor))
     }
 
-    /// Record a failure trace into the shadow genome.
     pub async fn record_failure(
         &mut self,
         trace: FailureTrace,
@@ -178,7 +128,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Capture a snapshot of the persistable system state.
     pub fn snapshot(&self, now: i64) -> Snapshot {
         Snapshot {
             version: SNAPSHOT_VERSION.to_string(),
@@ -191,7 +140,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         }
     }
 
-    /// Restore from snapshot. Verifies chain integrity and version.
     pub fn restore(&mut self, snapshot: Snapshot) -> Result<(), PersistError> {
         if snapshot.version != SNAPSHOT_VERSION {
             return Err(PersistError::IncompatibleVersion {
@@ -211,7 +159,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Save system state to a JSON file (atomic: write-tmp-then-rename).
     pub fn save_to_file(&self, path: &std::path::Path, now: i64) -> Result<(), PersistError> {
         let snapshot = self.snapshot(now);
         let json = serde_json::to_string_pretty(&snapshot)?;
@@ -221,11 +168,69 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Load from JSON file. Verifies integrity and version.
     pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), PersistError> {
         let json = std::fs::read_to_string(path)?;
         let snapshot: Snapshot = serde_json::from_str(&json)?;
         self.restore(snapshot)
+    }
+
+    /// O(1) L3 exact match by content address.
+    fn try_l3_exact_match(
+        &self,
+        content: &str,
+        start: std::time::Instant,
+    ) -> Option<QueryResult> {
+        let query_address = UorAddress::from_content(content);
+        let unit = self.l3.get_by_address(&query_address)?;
+        let elapsed = start.elapsed().as_millis() as u64;
+
+        Some(QueryResult {
+            recall: RecallResult {
+                memories: vec![ScoredMemory {
+                    unit: unit.clone(),
+                    relevance_score: 1.0,
+                    decayed_weight: 1.0,
+                }],
+                metrics: RecallMetrics {
+                    latency_ms: elapsed,
+                    tiers_queried: vec![Tier::L3],
+                    candidates_evaluated: 1,
+                    decay_filtered: 0,
+                },
+            },
+            latency_ms: elapsed,
+        })
+    }
+
+    /// Vector scan across tiers (slow path).
+    async fn vector_scan_query(
+        &self,
+        query: &Query,
+        now: i64,
+        start: std::time::Instant,
+    ) -> Result<QueryResult, EngineError> {
+        let rep = self.engine.encode(&query.content).await?;
+        let query_embedding = rep.as_vector();
+        let candidates = self.collect_candidates(query, now);
+        let tiers_queried = tier_list(query.constraints.require_tier);
+        let total_candidates = candidates.len();
+
+        let memories = decoder::decode(&candidates, &query_embedding, now, &self.config.decoder);
+        let decay_filtered = total_candidates - memories.len();
+        let elapsed = start.elapsed().as_millis() as u64;
+
+        Ok(QueryResult {
+            recall: RecallResult {
+                memories,
+                metrics: RecallMetrics {
+                    latency_ms: elapsed,
+                    tiers_queried,
+                    candidates_evaluated: total_candidates,
+                    decay_filtered,
+                },
+            },
+            latency_ms: elapsed,
+        })
     }
 
     fn collect_candidates(&self, query: &Query, now: i64) -> Vec<&MemoryUnit> {
@@ -242,8 +247,4 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         }
         candidates
     }
-}
-
-fn tier_list(require: Option<Tier>) -> Vec<Tier> {
-    match require { Some(t) => vec![t], None => vec![Tier::L1, Tier::L2, Tier::L3] }
 }

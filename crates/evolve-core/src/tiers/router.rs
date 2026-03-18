@@ -58,7 +58,7 @@ pub fn route_memory_unit(
 ) -> RouteDecision {
     let factors = calculate_factors(unit);
     let mts_score = calculate_mts(&factors, weights);
-    let tier = determine_tier(mts_score, thresholds);
+    let tier = determine_tier(mts_score, unit.saturation, thresholds);
     RouteDecision {
         tier,
         mts_score,
@@ -83,7 +83,10 @@ fn calculate_mts(factors: &MtsFactors, weights: &MtsWeights) -> f32 {
         + factors.compute * weights.compute
 }
 
-fn determine_tier(score: f32, thresholds: &TierThresholds) -> Tier {
+fn determine_tier(score: f32, saturation: f32, thresholds: &TierThresholds) -> Tier {
+    if saturation >= 0.95 {
+        return Tier::L3;
+    }
     if score >= thresholds.l3 {
         Tier::L3
     } else if score >= thresholds.l2 {
