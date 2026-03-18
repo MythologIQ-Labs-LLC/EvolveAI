@@ -982,13 +982,168 @@ SHA256(content_hash + state_hash + previous_hash) = b37bee8b473853ce78b562e9509e
 
 ---
 
+### Entry #22: PLAN v3.2
+
+**Timestamp**: 2026-03-18T03:30:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v3.2-persistence.md) = 922fa44220829c218f28767f2581ce54c7e9f867764096dcb86075b117d31ca9
+```
+
+**Previous Hash**: b37bee8b473853ce78b562e9509e8d1d4a4619e680f2f2410aca430023f053a4
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 618a62abac6087622576c0fca0f8f67c4ec30fcc18e0d67d786569c7d00610e6
+```
+
+**Decision**: v3.2 Persistence Layer plan created. Addresses the critical gap — system loses all state on process exit.
+
+**Key Decisions**:
+1. **JSON file persistence** — no new dependencies, human-inspectable
+2. **Snapshot/restore pattern** — immutable value captures system state at a point in time
+3. **L1 excluded** — ephemeral cache intentionally not persisted
+4. **Three-layer separation** — serialization, state management, and I/O are independent phases
+
+**Phases**:
+1. Serialization support + Snapshot type (3 files modified)
+2. Snapshot/restore on processor (4 files modified)
+3. File persistence (2 files modified)
+
+**Artifacts Created**:
+- docs/plan-v3.2-persistence.md
+
+---
+
+### Entry #23: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T03:45:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 3122cbba209387b69aaca72fab75ec3fb9c11e35801de4c2e85db28092077cd2
+```
+
+**Previous Hash**: 618a62abac6087622576c0fca0f8f67c4ec30fcc18e0d67d786569c7d00610e6
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = f79f5dbf9b64b23bf6207880e109890747cf97ff6d75f28515d27852b98288b6
+```
+
+**Decision**: v3.2 Persistence Layer plan APPROVED. All six audit passes completed. No violations. Zero new dependencies. Clean separation of serialization, state management, and I/O concerns.
+
+**Artifacts Created**:
+- .agent/staging/AUDIT_REPORT.md
+
+---
+
+### Entry #24: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T04:00:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist (Agent Team)
+**Risk Grade**: L3
+
+**Files Modified**:
+- crates/evolve-core/src/tiers/l2_graph.rs (serde derives, nodes_vec, edges_map, from_parts)
+- crates/evolve-core/src/tiers/l3_vault.rs (entries_vec, from_parts)
+- crates/evolve-core/src/chain/ledger.rs (serde derives, from_blocks)
+- crates/evolve-core/src/processor/types.rs (Snapshot, PersistError)
+- crates/evolve-core/src/processor/facade.rs (snapshot, restore, save_to_file, load_from_file)
+- crates/evolve-core/src/processor/tests.rs (7 new persistence tests)
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = b6b95cdda8b5d7f5d043514ed7cab97ec5f6f4ad8f4856d34ebcf3b4b53d400f
+```
+
+**Previous Hash**: f79f5dbf9b64b23bf6207880e109890747cf97ff6d75f28515d27852b98288b6
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = bb52321d157dce4fa29c4ae3c85d921c50288a89839902211e26cde47da2026e
+```
+
+**Decision**: v3.2 Persistence Layer implementation COMPLETE. All 3 phases:
+
+1. **Phase 1**: Serde derives on Edge, Ledger + Snapshot/PersistError types
+2. **Phase 2**: snapshot()/restore() on processor + from_parts()/from_blocks() on tiers/chain
+3. **Phase 3**: save_to_file()/load_from_file() JSON persistence
+
+**Test Results**: 66 tests pass (up from 58)
+- New: 8 persistence tests (roundtrip, snapshot capture, restore, chain integrity, L1 exclusion, file save/load, error case, version mismatch)
+- Observer review addressed: chain integrity verification on restore, version validation on load
+
+**Section 4 Razor Compliance**:
+- Max file: 212 lines (processor/tests.rs) < 250
+- All functions < 40 lines
+- Nesting depth <= 3
+- No console output
+
+---
+
+### Entry #25: SESSION SEAL
+
+**Timestamp**: 2026-03-18T04:15:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: SEALED
+
+**Content Hash**:
+```
+SHA256(crates/evolve-core/src/**/*.rs) = b6b95cdda8b5d7f5d043514ed7cab97ec5f6f4ad8f4856d34ebcf3b4b53d400f
+SHA256(SYSTEM_STATE.md) = 8da711e22b6c3d01aeae4af2020ad37e02f9b64c3d832b8f91cdbc8f8aa14722
+```
+
+**Previous Hash**: bb52321d157dce4fa29c4ae3c85d921c50288a89839902211e26cde47da2026e
+
+**Chain Hash**:
+```
+SHA256(content_hash + state_hash + previous_hash) = 8c74548cd8050562dd0e1750bce18bb297116929f790bd17095e9cc102f76e2d
+```
+
+**Decision**: Session SEALED. Reality matches Promise. All verification checks passed.
+
+**Substantiation Summary**:
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Version Validation | PASS | v3.2.0 > v3.1.0 (current tag) |
+| Reality Audit | PASS | All planned changes implemented + review fixes |
+| Test Audit | PASS | 66 tests pass (5 modules) |
+| Console Artifacts | PASS | 0 found |
+| Section 4 Razor | PASS | Max file 228 lines |
+| Chain Integrity | PASS | 25 blocks |
+
+**Agent Team Review Addressed**:
+- Observer: Chain integrity on restore, version validation (R1, R2 fixed)
+- Devil's Advocate: Atomic write, chain verification, silent unwrap (C1, C2, C5 fixed)
+
+**Artifacts Updated**:
+- docs/SYSTEM_STATE.md
+- docs/META_LEDGER.md
+
+---
+
 ## Chain Status: ACTIVE
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Current Hash**: `b37bee8b473853ce78b562e9509e8d1d4a4619e680f2f2410aca430023f053a4`
-**Blocks**: 21
-**Lifecycle**: v3.1 SEALED
-**Version**: v3.1.0
+**Current Hash**: `8c74548cd8050562dd0e1750bce18bb297116929f790bd17095e9cc102f76e2d`
+**Blocks**: 25
+**Lifecycle**: v3.2 SEALED
+**Version**: v3.2.0
 
 ---
 

@@ -1,8 +1,9 @@
 use crate::chain::block::Block;
 use crate::chain::hash;
+use serde::{Deserialize, Serialize};
 
 /// In-memory hash chain ledger providing append-only integrity.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Ledger {
     blocks: Vec<Block>,
 }
@@ -68,6 +69,13 @@ impl Ledger {
             }
         }
         true
+    }
+
+    /// Reconstruct ledger from existing blocks.
+    /// Caller must ensure blocks form a valid chain.
+    pub fn from_blocks(blocks: Vec<Block>) -> Self {
+        assert!(!blocks.is_empty(), "ledger requires at least genesis block");
+        Self { blocks }
     }
 }
 

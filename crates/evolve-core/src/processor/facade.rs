@@ -1,7 +1,10 @@
+use crate::chain::ledger::Ledger;
 use crate::memory::decoder::{self, DecoderConfig};
 use crate::memory::encoder::{self, EncoderConfig};
 use crate::memory::types::*;
-use crate::processor::types::*;
+use crate::processor::types::{
+    EncodeResult, PersistError, ProcessorStats, QueryResult, Snapshot, SNAPSHOT_VERSION,
+};
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::tiers::l1_cache::L1Cache;
 use crate::tiers::l2_graph::L2Graph;
@@ -126,6 +129,57 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     /// Health check — verifies L3 chain integrity.
     pub fn health_check(&self) -> bool {
         self.l3.verify_integrity()
+    }
+
+    /// Capture a snapshot of the persistable system state.
+    pub fn snapshot(&self, now: i64) -> Snapshot {
+        Snapshot {
+            version: "3.2.0".to_string(),
+            created_at: now,
+            l2_nodes: self.l2.nodes_vec(),
+            l2_edges: self.l2.edges_map().clone(),
+            l3_entries: self.l3.entries_vec(),
+            l3_blocks: self.l3.ledger().blocks().to_vec(),
+        }
+    }
+
+    /// Restore system state from a snapshot. Replaces L2 and L3.
+    /// Verifies chain integrity and snapshot version before accepting.
+    pub fn restore(&mut self, snapshot: Snapshot) -> Result<(), PersistError> {
+        if snapshot.version != SNAPSHOT_VERSION {
+            return Err(PersistError::IncompatibleVersion {
+                expected: SNAPSHOT_VERSION.to_string(),
+                found: snapshot.version,
+            });
+        }
+
+        let ledger = Ledger::from_blocks(snapshot.l3_blocks);
+        if !ledger.verify() {
+            return Err(PersistError::ChainIntegrityFailed);
+        }
+
+        self.l2 = L2Graph::from_parts(snapshot.l2_nodes, snapshot.l2_edges);
+        self.l3 = L3Vault::from_parts(snapshot.l3_entries, ledger);
+        Ok(())
+    }
+
+    /// Save system state to a JSON file.
+    /// Uses write-to-temp-then-rename for atomic replacement.
+    pub fn save_to_file(&self, path: &std::path::Path, now: i64) -> Result<(), PersistError> {
+        let snapshot = self.snapshot(now);
+        let json = serde_json::to_string_pretty(&snapshot)?;
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, &json)?;
+        std::fs::rename(&tmp, path)?;
+        Ok(())
+    }
+
+    /// Load system state from a JSON file, replacing L2 and L3.
+    /// Verifies chain integrity and version compatibility.
+    pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), PersistError> {
+        let json = std::fs::read_to_string(path)?;
+        let snapshot: Snapshot = serde_json::from_str(&json)?;
+        self.restore(snapshot)
     }
 
     fn collect_candidates(&self, query: &Query, now: i64) -> Vec<&MemoryUnit> {

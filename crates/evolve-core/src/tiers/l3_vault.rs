@@ -20,7 +20,7 @@ impl L3Vault {
 
     /// Store a memory unit and record its hash on the ledger.
     pub fn store(&mut self, unit: MemoryUnit) {
-        let data = serde_json::to_vec(&unit).unwrap_or_default();
+        let data = serde_json::to_vec(&unit).expect("MemoryUnit serialization cannot fail");
         let data_hash = hash::content_hash(&data);
         self.ledger.append(data_hash);
         self.entries.insert(unit.uor_id, unit);
@@ -54,6 +54,17 @@ impl L3Vault {
     /// Borrow the ledger for inspection.
     pub fn ledger(&self) -> &Ledger {
         &self.ledger
+    }
+
+    /// Get all entries as a vec (for snapshotting).
+    pub fn entries_vec(&self) -> Vec<MemoryUnit> {
+        self.entries.values().cloned().collect()
+    }
+
+    /// Reconstruct from parts (entries + ledger).
+    pub fn from_parts(entries: Vec<MemoryUnit>, ledger: Ledger) -> Self {
+        let entry_map = entries.into_iter().map(|u| (u.uor_id, u)).collect();
+        Self { entries: entry_map, ledger }
     }
 }
 

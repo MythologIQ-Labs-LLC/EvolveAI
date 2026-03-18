@@ -1,8 +1,9 @@
 use crate::memory::types::{MemoryUnit, UorId};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A weighted, timestamped edge between two memory nodes.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Edge {
     pub target: UorId,
     pub weight: f32,
@@ -84,6 +85,22 @@ impl L2Graph {
             edges.retain(|e| e.target != *id);
         }
         self.nodes.remove(id)
+    }
+
+    /// Get all nodes as a vec (for snapshotting).
+    pub fn nodes_vec(&self) -> Vec<MemoryUnit> {
+        self.nodes.values().cloned().collect()
+    }
+
+    /// Get edges map reference (for snapshotting).
+    pub fn edges_map(&self) -> &HashMap<UorId, Vec<Edge>> {
+        &self.edges
+    }
+
+    /// Reconstruct from parts.
+    pub fn from_parts(nodes: Vec<MemoryUnit>, edges: HashMap<UorId, Vec<Edge>>) -> Self {
+        let node_map = nodes.into_iter().map(|u| (u.uor_id, u)).collect();
+        Self { nodes: node_map, edges }
     }
 }
 
