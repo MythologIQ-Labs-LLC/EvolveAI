@@ -1,0 +1,68 @@
+{
+  "appId": "com.mythologiq.evolveai",
+  "productName": "EvolveAI",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    ".next/**/*",
+    "public/**/*",
+    "node_modules/**/*",
+    "package.json",
+    "next.config.mjs",
+    "tailwind.config.ts",
+    "postcss.config.mjs",
+    "components.json",
+    "tsconfig.json",
+    "lib/**/*",
+    "hooks/**/*",
+    "styles/**/*",
+    "rules/**/*",
+    "supabase/**/*",
+    "stats/**/*",
+    "docs/**/*",
+    "scripts/**/*",
+    "installer/**/*",
+    "launch-evolveai.bat",
+    "diagnose-evolveai.bat",
+    "test-dev.bat",
+    "electron/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/evolveai-icon.ico",
+    "requestedExecutionLevel": "requireAdministrator"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "EvolveAI",
+    "installerIcon": "public/evolveai-icon.ico",
+    "uninstallerIcon": "public/evolveai-icon.ico",
+    "installerHeaderIcon": "public/evolveai-icon.ico",
+    "deleteAppDataOnUninstall": false,
+    "include": "installer/installer.nsh"
+  },
+  "mac": {
+    "target": "dmg",
+    "icon": "public/evolveai-icon.icns",
+    "category": "public.app-category.productivity"
+  },
+  "linux": {
+    "target": "AppImage",
+    "icon": "public/evolveai-icon.png",
+    "category": "Utility"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "WulfForge",
+    "repo": "EvolveAI"
+  }
+} 

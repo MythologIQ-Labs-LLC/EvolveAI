@@ -1,0 +1,14 @@
+Windows Registry Editor Version 5.00
+
+; EvolveAI Port Reservation Registry Entry
+; This helps Windows prioritize these ports for EvolveAI
+; Note: This is optional and for advanced users only
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\ReservedPorts]
+"4000-4010"="EvolveAI Reserved Port Range"
+
+; Alternative: User-level reservation (safer)
+[HKEY_CURRENT_USER\Software\EvolveAI\PortReservation]
+"ReservedPorts"="4000-4010"
+"Description"="EvolveAI Desktop Application Reserved Ports"
+"Version"="1.0" 

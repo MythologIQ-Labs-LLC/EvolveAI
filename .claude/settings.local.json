@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Date -Format ''yyyy-MM-ddTHH:mm:ssZ''\")",
+      "Bash(powershell -Command \"$concept = Get-Content -Path ''docs/CONCEPT.md'' -Raw; $arch = Get-Content -Path ''docs/ARCHITECTURE_PLAN.md'' -Raw; $combined = $concept + $arch; $bytes = [System.Text.Encoding]::UTF8.GetBytes\\($combined\\); $sha256 = [System.Security.Cryptography.SHA256]::Create\\(\\); $hash = $sha256.ComputeHash\\($bytes\\); [System.BitConverter]::ToString\\($hash\\).Replace\\(''-'',''''\\).ToLower\\(\\)\")",
+      "Bash(powershell -Command \"Get-FileHash -Path docs/CONCEPT.md -Algorithm SHA256 | Select-Object -ExpandProperty Hash\")",
+      "Bash(powershell -Command:*)",
+      "Bash(unzip:*)",
+      "Bash(xargs cat:*)",
+      "Read(//d/EvolveAI/**)",
+      "Bash(python:*)",
+      "Bash(npm install)",
+      "Bash(npm test:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File scripts/compute-hash.ps1)",
+      "Bash(powershell -ExecutionPolicy Bypass -File d:/EvolveAI/scripts/chain-hash.ps1 -ContentHash \"f3c0f4f7994375b36b18e59b5eef8f9b021e6bac27336c07189a8088a0f9e3c8\" -PreviousHash \"e46dbca821b7daba12b52697475586aebc8fa016a963d94e94ca1b90686d13b3\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: release v1.0.0 - QoreLogic RELEASE phase\n\nInitial release of EvolveAI Autopoietic Memory System:\n- Neural Net Processor with 5-Phase Metabolic Lifecycle\n- Tri-layer memory \\(L1 Cache, L2 Graph, L3 UOR Vault\\)\n- CMHL decay engine for memory half-life computation\n- MTS routing algorithm with MoE architecture\n- Shadow Genome Interceptor for semantic safety\n- 51 passing tests\n\nLicense changed to Apache-2.0 \\(aligned with UOR Framework\\).\n\nChain Hash: 78293bb1eef2fc17d7fbc325c7c8d639026306fe2a237ef0f7f7b21f446a475f\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git tag:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
