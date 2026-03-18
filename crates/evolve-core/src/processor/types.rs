@@ -30,6 +30,8 @@ pub struct ProcessorStats {
     pub l3_size: usize,
     pub l3_chain_length: usize,
     pub l3_integrity: bool,
+    pub phase: crate::lifecycle::types::Phase,
+    pub trace_count: usize,
 }
 
 /// Persistable snapshot of the memory system state.

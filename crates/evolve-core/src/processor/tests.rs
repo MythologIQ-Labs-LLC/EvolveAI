@@ -275,3 +275,23 @@ async fn test_snapshot_includes_shadow() {
     let snap = proc.snapshot(2000);
     assert!(!snap.shadow_entries.is_empty());
 }
+
+#[test]
+fn test_processor_lifecycle_start() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert_eq!(proc.phase(), crate::lifecycle::types::Phase::Idle);
+
+    proc.start_session(1000).unwrap();
+    assert_eq!(proc.phase(), crate::lifecycle::types::Phase::Idle);
+    assert_eq!(proc.stats().trace_count, 0);
+}
+
+#[tokio::test]
+async fn test_processor_stats_includes_lifecycle() {
+    let engine = MockEngine::new(32);
+    let proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let stats = proc.stats();
+    assert_eq!(stats.phase, crate::lifecycle::types::Phase::Idle);
+    assert_eq!(stats.trace_count, 0);
+}

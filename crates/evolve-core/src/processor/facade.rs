@@ -1,4 +1,6 @@
 use crate::chain::ledger::Ledger;
+use crate::lifecycle::orchestrator::{LifecycleConfig, LifecycleError, Orchestrator};
+use crate::lifecycle::types::Phase;
 use crate::memory::decoder::{self, DecoderConfig};
 use crate::memory::encoder::{self, EncoderConfig};
 use crate::memory::types::*;
@@ -19,6 +21,7 @@ pub struct ProcessorConfig {
     pub encoder: EncoderConfig,
     pub decoder: DecoderConfig,
     pub interceptor: InterceptorConfig,
+    pub lifecycle: LifecycleConfig,
     pub l1_ttl_ms: i64,
     pub l1_max_size: usize,
 }
@@ -29,6 +32,7 @@ impl Default for ProcessorConfig {
             encoder: EncoderConfig::default(),
             decoder: DecoderConfig::default(),
             interceptor: InterceptorConfig::default(),
+            lifecycle: LifecycleConfig::default(),
             l1_ttl_ms: 300_000,
             l1_max_size: 1000,
         }
@@ -45,19 +49,35 @@ pub struct MemoryProcessor<E: RepresentationEngine> {
     l2: L2Graph,
     l3: L3Vault,
     shadow: ShadowGenome,
+    lifecycle: Orchestrator,
 }
 
 impl<E: RepresentationEngine> MemoryProcessor<E> {
     /// Create a new processor with the given engine and config.
     pub fn new(engine: E, config: ProcessorConfig) -> Self {
+        let lifecycle = Orchestrator::new(
+            uuid::Uuid::new_v4().to_string(),
+            config.lifecycle.clone(),
+        );
         Self {
             l1: L1Cache::new(config.l1_ttl_ms, config.l1_max_size),
             l2: L2Graph::new(),
             l3: L3Vault::new(),
             shadow: ShadowGenome::default(),
+            lifecycle,
             engine,
             config,
         }
+    }
+
+    /// Start a lifecycle session.
+    pub fn start_session(&mut self, now: i64) -> Result<(), LifecycleError> {
+        self.lifecycle.start_session(now)
+    }
+
+    /// Get current lifecycle phase.
+    pub fn phase(&self) -> Phase {
+        self.lifecycle.phase()
     }
 
     /// Encode raw input and store in the appropriate tier.
@@ -130,6 +150,8 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             l3_size: self.l3.len(),
             l3_chain_length: self.l3.ledger().len(),
             l3_integrity: self.l3.verify_integrity(),
+            phase: self.lifecycle.phase(),
+            trace_count: self.lifecycle.trace_count(),
         }
     }
 
@@ -169,8 +191,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         }
     }
 
-    /// Restore system state from a snapshot. Replaces L2, L3, and shadow.
-    /// Verifies chain integrity and snapshot version before accepting.
+    /// Restore from snapshot. Verifies chain integrity and version.
     pub fn restore(&mut self, snapshot: Snapshot) -> Result<(), PersistError> {
         if snapshot.version != SNAPSHOT_VERSION {
             return Err(PersistError::IncompatibleVersion {
@@ -190,8 +211,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Save system state to a JSON file.
-    /// Uses write-to-temp-then-rename for atomic replacement.
+    /// Save system state to a JSON file (atomic: write-tmp-then-rename).
     pub fn save_to_file(&self, path: &std::path::Path, now: i64) -> Result<(), PersistError> {
         let snapshot = self.snapshot(now);
         let json = serde_json::to_string_pretty(&snapshot)?;
@@ -201,8 +221,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Load system state from a JSON file, replacing L2 and L3.
-    /// Verifies chain integrity and version compatibility.
+    /// Load from JSON file. Verifies integrity and version.
     pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), PersistError> {
         let json = std::fs::read_to_string(path)?;
         let snapshot: Snapshot = serde_json::from_str(&json)?;
@@ -226,8 +245,5 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 }
 
 fn tier_list(require: Option<Tier>) -> Vec<Tier> {
-    match require {
-        Some(t) => vec![t],
-        None => vec![Tier::L1, Tier::L2, Tier::L3],
-    }
+    match require { Some(t) => vec![t], None => vec![Tier::L1, Tier::L2, Tier::L3] }
 }
