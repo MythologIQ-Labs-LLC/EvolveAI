@@ -156,16 +156,35 @@ Where `FiberDelta` captures which fibers were pinned (or unpinned) and by what c
 - **Content-addressed storage** systems (IPFS, Perkeep) — these handle identity but not lifecycle.
 - **Reinforcement-based caching** (frequency-aware eviction) — related intuition, but without the algebraic foundation.
 
+## Reference Implementation
+
+EvolveAI (v5.0–v5.9) implements this proposal as a working Rust library with 206 tests:
+
+| Theoretical Claim | Implementation | Proven By |
+|---|---|---|
+| BLAKE3 content-addressing | `UorAddress::from_content()` | `test_blake3_deterministic` |
+| $\sigma = 1 \rightarrow$ zero decay | `calculate_decay(σ=1.0)` returns 1.0 | `test_decay_saturated_memory_no_decay` |
+| Weighted fiber pinning (Cooling) | `PinningEvent` enum (4 tiers) | `test_crypto_verification_pins_faster_than_access` |
+| Entropy injection (Heating) | `inject_entropy(σ, severity)` | `test_entropy_accelerates_decay` |
+| $O(1)$ crystallized lookup | `try_l3_exact_match()` fast path | `test_l3_address_lookup_o1` |
+| Self-optimization loop | encode → link → pin → promote → $O(1)$ | `test_complete_thermodynamic_lifecycle` |
+| Hardware-aware $\lambda_{base}$ | `pressure_adjusted_half_life()` | `test_adjusted_half_life_decreases_under_pressure` |
+| Phase transitions (Gas → Liquid → Crystal) | L1 → L2 → L3 tier promotion at $\sigma \geq 0.95$ | `test_promotion_l2_to_l3_on_crystallization` |
+| Entropy injection evaporates disputed data | `record_conflict()` unpins fibers | `test_disputed_memory_evaporates` |
+| Zero-trust crystallization | `CrystallizationPolicy::RequireApproval` | `test_crystallization_guard_prevents_hallucination_permanence` |
+| Source provenance | `TrustLevel` determines initial $\sigma$ | `test_unverified_content_requires_more_evidence` |
+
+47 source files. Apache-2.0 licensed. [github.com/MythologIQ/EvolveAI](https://github.com/MythologIQ/EvolveAI)
+
 ## Next Steps
 
 If there's interest, I'd be happy to:
 
 - Formalize the discrete $\lambda_{eff} = \lambda_{base} \times T_{ctx}$ step-function model as a conformance test for the Universal Runtime (UR) specification.
 - Draft ontology extensions (if new classes/properties are needed).
-- Prototype the saturation-driven query optimization ($O(N) \rightarrow O(1)$ migration) driven purely by the $\sigma$ variable.
-- Write up the threat-pattern crystallization model in more detail.
-- Draft a simulation of Entropy Injection (conflict resolution) to observe how quickly contradictory data evaporates.
+- Discuss the zero-trust crystallization model — how `RequireApproval` prevents hallucination permanence.
+- Explore how the weighted pinning hierarchy could map to UOR's Certificate layer.
 
 ---
 
-*This exploration was motivated by independent research into how content-addressed identity systems can leverage their own algebraic structure to solve the memory lifecycle problem — rather than treating decay as an external parameter.*
+*This exploration was motivated by independent research into how content-addressed identity systems can leverage their own algebraic structure to solve the memory lifecycle problem — rather than treating decay as an external parameter. The reference implementation validates that every theoretical claim produces the predicted behavior in practice.*
