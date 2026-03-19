@@ -188,6 +188,14 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         )
     }
 
+    /// List L2 memories with σ≥0.95 awaiting crystallization approval.
+    pub fn pending_crystallizations(&self) -> Vec<UorAddress> {
+        self.l2.iter_units()
+            .filter(|u| u.saturation >= 0.95)
+            .map(|u| u.address.clone())
+            .collect()
+    }
+
     fn pin_session_peers(&mut self, _new_addr: &UorAddress, _now: i64) {
         trust::pin_session_peers(&mut self.l2, &self.session_log);
     }
