@@ -6,6 +6,7 @@ use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::persist;
 use crate::processor::query as query_mod;
+use crate::processor::ingest;
 use crate::processor::profile::{self, CognitiveProfile};
 use crate::processor::slo::{SloReport, SloSample, SloTracker};
 use crate::processor::types::{
@@ -240,4 +241,9 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         persist::load_from_file(&mut self.l2, &mut self.l3, &mut self.shadow, path)
     }
 
+    pub async fn ingest_file(
+        &mut self, path: &std::path::Path, tags: Vec<String>, now: i64,
+    ) -> Result<ingest::IngestResult, ingest::IngestError> {
+        ingest::ingest_file(self, path, tags, &ingest::ChunkConfig::default(), now).await
+    }
 }

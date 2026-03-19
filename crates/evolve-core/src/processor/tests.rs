@@ -775,3 +775,73 @@ fn test_profile_to_summary_readable() {
     assert!(summary.contains("Crystallized: 1"));
     assert!(summary.contains("42.0%"));
 }
+
+// --- File ingestion tests (v5.6) ---
+
+use crate::processor::ingest::{chunk_text, ChunkConfig};
+
+#[test]
+fn test_chunk_text_splits_at_paragraphs() {
+    let text = "Alpha paragraph.\n\nBeta paragraph.\n\nGamma paragraph.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 20, min_chunk_chars: 5 });
+    assert_eq!(chunks.len(), 3);
+}
+
+#[test]
+fn test_chunk_text_merges_small_paragraphs() {
+    let text = "Hi there.\n\nBye now.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 100, min_chunk_chars: 5 });
+    assert_eq!(chunks.len(), 1);
+    assert!(chunks[0].contains("Hi there."));
+    assert!(chunks[0].contains("Bye now."));
+}
+
+#[test]
+fn test_chunk_text_skips_tiny_chunks() {
+    let text = "Ok";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 100, min_chunk_chars: 10 });
+    assert!(chunks.is_empty());
+}
+
+#[test]
+fn test_chunk_text_empty_input() {
+    let chunks = chunk_text("", &ChunkConfig::default());
+    assert!(chunks.is_empty());
+}
+
+#[test]
+fn test_chunk_text_respects_max() {
+    let text = "A long paragraph that exceeds the limit.\n\nAnother one here.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 30, min_chunk_chars: 5 });
+    assert!(chunks.len() >= 2);
+}
+
+#[tokio::test]
+async fn test_ingest_text_creates_memories() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let text = "First paragraph about Rust.\n\nSecond paragraph about memory.\n\nThird about graphs.";
+    let result = crate::processor::ingest::ingest_text(
+        &mut proc, text, "test.md", vec![], &ChunkConfig { max_chunk_chars: 40, min_chunk_chars: 10 }, 1000,
+    ).await.unwrap();
+    assert!(result.chunks >= 2);
+    assert_eq!(result.addresses.len(), result.chunks);
+}
+
+#[tokio::test]
+async fn test_ingest_text_preserves_source() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = crate::processor::ingest::ingest_text(
+        &mut proc, "Content here is long enough to be a chunk.", "notes.md", vec![], &ChunkConfig::default(), 1000,
+    ).await.unwrap();
+    assert_eq!(result.source, "notes.md");
+}
+
+#[tokio::test]
+async fn test_ingest_file_nonexistent_returns_error() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.ingest_file(std::path::Path::new("/nonexistent/file.txt"), vec![], 1000).await;
+    assert!(result.is_err());
+}

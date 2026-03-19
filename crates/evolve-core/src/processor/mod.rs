@@ -4,6 +4,7 @@ pub mod persist;
 pub mod query;
 pub mod slo;
 pub mod profile;
+pub mod ingest;
 
 pub use types::*;
 pub use facade::*;

@@ -104,28 +104,32 @@ impl SimpleMemory {
         self.processor.record_conflict(addr, severity)
     }
 
-    /// End the current session (clears co-capture linking state).
+    /// Ingest a text file, chunking it into memories automatically.
+    pub async fn add_file(
+        &mut self,
+        path: &std::path::Path,
+    ) -> Result<crate::processor::ingest::IngestResult, crate::processor::ingest::IngestError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        self.processor.ingest_file(path, vec![], now).await
+    }
+
     pub fn end_session(&mut self) {
         self.processor.clear_session();
     }
 
-    /// Get a cognitive profile of the memory system's knowledge state.
     pub fn profile(&self) -> crate::processor::profile::CognitiveProfile {
         let now = chrono::Utc::now().timestamp_millis();
         self.processor.profile(now)
     }
 
-    /// Get the current SLO report.
     pub fn slo_report(&self) -> crate::processor::slo::SloReport {
         self.processor.slo_report()
     }
 
-    /// Access the full processor for power-user operations.
     pub fn processor(&self) -> &MemoryProcessor<MockEngine> {
         &self.processor
     }
 
-    /// Consume into the full processor.
     pub fn into_processor(self) -> MemoryProcessor<MockEngine> {
         self.processor
     }
@@ -200,6 +204,20 @@ mod tests {
         let mem = SimpleMemory::new();
         let results = mem.search("anything", 10).await.unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_simple_add_file() {
+        let dir = std::env::temp_dir().join("evolve-simple-test");
+        std::fs::create_dir_all(&dir).ok();
+        let path = dir.join("test_ingest.txt");
+        std::fs::write(&path, "First paragraph here is long enough.\n\nSecond paragraph also long enough.").ok();
+        let mut mem = SimpleMemory::new();
+        let result = mem.add_file(&path).await.unwrap();
+        assert!(result.chunks > 0);
+        assert!(mem.processor().stats().l2_nodes > 0 || mem.processor().stats().l3_size > 0);
+        std::fs::remove_file(&path).ok();
+        std::fs::remove_dir(&dir).ok();
     }
 
     #[tokio::test]
