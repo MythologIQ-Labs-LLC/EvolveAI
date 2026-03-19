@@ -180,7 +180,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         self.session_log.clear();
     }
 
-    /// Record a pinning event, boosting saturation. Promotes L2->L3 per policy.
     pub fn record_access(&mut self, addr: &UorAddress, event: PinningEvent) -> bool {
         trust::record_access(
             &mut self.l2, &mut self.l3, addr, event,
@@ -200,13 +199,10 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         trust::pin_session_peers(&mut self.l2, &self.session_log);
     }
 
-    /// Record a conflict, injecting entropy to unpin fibers.
-    /// Returns the new saturation, or None if address not found.
     pub fn record_conflict(&mut self, addr: &UorAddress, severity: f32) -> Option<f32> {
         trust::record_conflict(&mut self.l2, &mut self.l3, addr, severity)
     }
 
-    /// Explicitly approve crystallization (L2->L3) for a unit at σ>=0.95.
     pub fn approve_crystallization(&mut self, addr: &UorAddress) -> bool {
         trust::approve_crystallization(&mut self.l2, &mut self.l3, addr)
     }
@@ -231,5 +227,23 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         &mut self, path: &std::path::Path, tags: Vec<String>, now: i64,
     ) -> Result<ingest::IngestResult, ingest::IngestError> {
         ingest::ingest_file(self, path, tags, &ingest::ChunkConfig::default(), now).await
+    }
+
+    pub fn forget(&mut self, addr: &UorAddress) -> bool {
+        if self.l2.remove(addr).is_some() {
+            return true;
+        }
+        if self.l3.remove(addr).is_some() {
+            return true;
+        }
+        false
+    }
+
+    pub fn related(&self, addr: &UorAddress) -> Vec<&MemoryUnit> {
+        self.l2.neighbors(addr)
+    }
+
+    pub fn association_count(&self, addr: &UorAddress) -> usize {
+        self.l2.edges_from(addr).len()
     }
 }

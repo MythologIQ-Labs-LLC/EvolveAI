@@ -37,6 +37,11 @@ impl L3Vault {
         self.entries.get(addr)
     }
 
+    /// Remove an entry. Returns the unit if found.
+    pub(crate) fn remove(&mut self, addr: &UorAddress) -> Option<MemoryUnit> {
+        self.entries.remove(addr)
+    }
+
     /// Get a mutable reference to an entry by address.
     pub fn get_mut(&mut self, addr: &UorAddress) -> Option<&mut MemoryUnit> {
         self.entries.get_mut(addr)

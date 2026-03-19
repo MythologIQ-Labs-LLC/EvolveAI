@@ -959,3 +959,76 @@ async fn test_encode_respects_trust_level() {
     let result = proc.encode(&input, 1000).await.unwrap();
     assert!((result.unit.saturation - 0.1).abs() < 1e-6);
 }
+
+// --- Memory deletion & traversal tests (v5.8) ---
+
+#[tokio::test]
+async fn test_forget_removes_from_l2() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("forget me", vec![]), 1000).await.unwrap();
+    assert!(proc.stats().l2_nodes > 0);
+    assert!(proc.forget(&result.unit.address));
+    assert_eq!(proc.stats().l2_nodes, 0);
+}
+
+#[tokio::test]
+async fn test_forget_removes_from_l3() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("secret delete", vec!["sensitive"]), 1000).await.unwrap();
+    let addr = UorAddress::from_content("secret delete");
+    assert!(proc.stats().l3_size > 0);
+    assert!(proc.forget(&addr));
+    assert_eq!(proc.stats().l3_size, 0);
+}
+
+#[test]
+fn test_forget_not_found() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert!(!proc.forget(&UorAddress::from_content("nonexistent")));
+}
+
+#[tokio::test]
+async fn test_forget_cleans_edges() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("linked A", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("linked B", vec![]), 1001).await.unwrap();
+    assert!(proc.stats().l2_edges > 0);
+    proc.forget(&r1.unit.address);
+    // Edges involving the deleted node should be cleaned
+    assert_eq!(proc.association_count(&r1.unit.address), 0);
+}
+
+#[tokio::test]
+async fn test_related_returns_neighbors() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("node A", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("node B", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("node C", vec![]), 1002).await.unwrap();
+    let neighbors = proc.related(&r1.unit.address);
+    assert!(neighbors.len() >= 1);
+}
+
+#[tokio::test]
+async fn test_related_empty_for_isolated() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("alone", vec![]), 1000).await.unwrap();
+    proc.clear_session();
+    proc.encode(&make_input("separate", vec![]), 2000).await.unwrap();
+    assert!(proc.related(&r1.unit.address).is_empty());
+}
+
+#[tokio::test]
+async fn test_association_count() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("hub", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("spoke1", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("spoke2", vec![]), 1002).await.unwrap();
+    assert!(proc.association_count(&r1.unit.address) >= 2);
+}

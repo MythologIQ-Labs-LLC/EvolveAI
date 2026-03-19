@@ -96,6 +96,23 @@ async fn test_simple_slo_report() {
 }
 
 #[tokio::test]
+async fn test_simple_forget() {
+    let mut mem = SimpleMemory::new();
+    let addr = mem.add("temporary fact").await.unwrap();
+    assert!(mem.forget(&addr));
+    let results = mem.search("temporary fact", 5).await.unwrap();
+    assert!(results.is_empty());
+}
+
+#[tokio::test]
+async fn test_simple_related() {
+    let mut mem = SimpleMemory::new();
+    let addr = mem.add("fact alpha").await.unwrap();
+    mem.add("fact beta").await.unwrap();
+    assert!(!mem.related(&addr).is_empty());
+}
+
+#[tokio::test]
 async fn test_co_capture_links_within_session() {
     let mut mem = SimpleMemory::new();
     mem.add("fact A").await.unwrap();

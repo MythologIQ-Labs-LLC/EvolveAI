@@ -2606,13 +2606,53 @@ SHA256 = 3991b19c9604a13658fe5e5e92d213c2f74b7fa991794be1c8c5c4535a87eb27
 
 ---
 
+---
+
+### Entry #74: PLAN v5.8 + GATE TRIBUNAL
+
+**Timestamp**: 2026-03-19T05:30:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L2
+**Verdict**: PASS
+
+**Chain Hash**:
+```
+SHA256 = 13b780e218ad94a896edf035566dc60da0ef842a43775e9a315a824d0e1e9468
+```
+
+**Decision**: v5.8 Memory Deletion & Graph Traversal APPROVED. facade.rs projects to exactly 250 (zero headroom after this version).
+
+---
+
+---
+
+### Entry #75: IMPLEMENTATION + SEAL — v5.8.0
+
+**Timestamp**: 2026-03-19T06:00:00Z
+**Phase**: IMPLEMENT + SUBSTANTIATE
+**Author**: Specialist + Judge
+**Risk Grade**: L2
+
+**Changes**: forget() deletes from any tier, related() traverses L2 graph, L3Vault::remove() pub(crate)
+**Tests**: 194 pass (+9 new)
+
+**Chain Hash**:
+```
+SHA256 = 426872425520b3e450c1760a2cb118938ba42c4b26761ba70ca439f41fc05a79
+```
+
+**Decision**: v5.8 Memory Deletion & Graph Traversal COMPLETE. SimpleMemory API surface is now functionally complete.
+
+---
+
 ## Chain Status: SEALED
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Final Hash**: `3991b19c9604a13658fe5e5e92d213c2f74b7fa991794be1c8c5c4535a87eb27`
-**Blocks**: 73
-**Lifecycle**: RELEASED (v5.7.0)
-**Version**: v5.7.0
+**Final Hash**: `426872425520b3e450c1760a2cb118938ba42c4b26761ba70ca439f41fc05a79`
+**Blocks**: 75
+**Lifecycle**: RELEASED (v5.8.0)
+**Version**: v5.8.0
 
 ---
 

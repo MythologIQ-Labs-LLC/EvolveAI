@@ -138,6 +138,14 @@ impl SimpleMemory {
         Ok(result.unit.address)
     }
 
+    pub fn forget(&mut self, addr: &UorAddress) -> bool {
+        self.processor.forget(addr)
+    }
+
+    pub fn related(&self, addr: &UorAddress) -> Vec<&crate::memory::types::MemoryUnit> {
+        self.processor.related(addr)
+    }
+
     pub fn end_session(&mut self) {
         self.processor.clear_session();
     }
