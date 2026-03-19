@@ -48,9 +48,7 @@ pub async fn encode_memory(
         content_type: ContentType::Text,
         metadata: InputMetadata {
             tags,
-            source: None,
-            priority: Priority::Normal,
-            sensitivity: Sensitivity::Public,
+            ..Default::default()
         },
     };
     let now = chrono::Utc::now().timestamp_millis();

@@ -1,0 +1,12 @@
+[package]
+name = "evolve-cli"
+version = "6.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "EvolveAI memory system CLI"
+
+[dependencies]
+evolve-core = { path = "../evolve-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+chrono = "0.4"
+serde_json = "1"

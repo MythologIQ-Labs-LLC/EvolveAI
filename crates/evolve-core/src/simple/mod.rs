@@ -166,6 +166,17 @@ impl SimpleMemory {
     pub fn into_processor(self) -> MemoryProcessor<MockEngine> {
         self.processor
     }
+
+    /// Save state to a JSON file.
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), crate::processor::types::PersistError> {
+        let now = chrono::Utc::now().timestamp_millis();
+        self.processor.save_to_file(path, now)
+    }
+
+    /// Load state from a JSON file.
+    pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), crate::processor::types::PersistError> {
+        self.processor.load_from_file(path)
+    }
 }
 
 impl Default for SimpleMemory {

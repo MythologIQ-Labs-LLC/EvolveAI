@@ -2726,13 +2726,49 @@ SHA256 = 2d29ff6b8bd88d9f10386c621afb9cfb9e032a85b90e23e081bbcbe8d0a1bf91
 
 ---
 
+---
+
+### Entry #80: PLAN v6.1 + GATE TRIBUNAL
+
+**Timestamp**: 2026-03-19T07:15:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L1
+**Verdict**: PASS
+
+**Chain Hash**:
+```
+SHA256 = f7d1a3ebe0833ba387f75ac00612de02440f739181c02fc947410f39d52838a8
+```
+
+**Decision**: v6.1 Tauri Commands + CLI Tool APPROVED. Thin delegations + new binary crate. No framework deps.
+
+---
+
+---
+
+### Entry #81: IMPLEMENTATION + SEAL — v6.1.0
+
+**Timestamp**: 2026-03-19T07:45:00Z
+**Phase**: IMPLEMENT + SUBSTANTIATE
+**Author**: Specialist + Judge
+
+**Files Created**: src-tauri/src/commands_v2.rs (159), crates/evolve-cli/Cargo.toml, crates/evolve-cli/src/main.rs (244)
+**Files Modified**: src-tauri/src/commands.rs, src-tauri/src/main.rs, simple/mod.rs (+save/load)
+**Tests**: 206 pass (unchanged)
+
+**Decision**: v6.1 Tauri Commands + CLI Tool COMPLETE.
+- 8 new Tauri commands (feedback, dispute, approve, forget, profile, slo, related, pending)
+- CLI binary with 10 subcommands, persistent state to ~/.evolve/memory.json
+
+---
+
 ## Chain Status: SEALED
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Final Hash**: `2d29ff6b8bd88d9f10386c621afb9cfb9e032a85b90e23e081bbcbe8d0a1bf91`
-**Blocks**: 79
-**Lifecycle**: RELEASED (v6.0.0)
-**Version**: v6.0.0
+**Blocks**: 81
+**Lifecycle**: RELEASED (v6.1.0)
+**Version**: v6.1.0
 
 ---
 
