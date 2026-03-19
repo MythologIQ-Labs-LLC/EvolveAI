@@ -60,7 +60,10 @@ pub fn boost_saturation_weighted(current: f32, event: PinningEvent) -> f32 {
 }
 
 /// Inject entropy, unpinning fibers. Reduces σ by severity.
-/// Models thermodynamic conflict: disputed objects heat up and decay faster.
+/// Non-finite severity is treated as 0.0 (no change).
 pub fn inject_entropy(current: f32, severity: f32) -> f32 {
+    if !severity.is_finite() {
+        return current;
+    }
     (current - severity.clamp(0.0, 1.0)).max(0.0)
 }

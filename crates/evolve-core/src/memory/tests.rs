@@ -263,6 +263,18 @@ fn test_boost_weighted_never_exceeds_one() {
 // --- Entropy injection tests (v5.1) ---
 
 #[test]
+fn test_inject_entropy_nan_severity_no_change() {
+    let result = inject_entropy(0.8, f32::NAN);
+    assert!((result - 0.8).abs() < 1e-6);
+}
+
+#[test]
+fn test_inject_entropy_infinity_severity_no_change() {
+    let result = inject_entropy(0.8, f32::INFINITY);
+    assert!((result - 0.8).abs() < 1e-6);
+}
+
+#[test]
 fn test_inject_entropy_reduces_saturation() {
     let result = inject_entropy(0.8, 0.3);
     assert!((result - 0.5).abs() < 1e-6);

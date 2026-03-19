@@ -288,7 +288,7 @@ Create a simplified API layer over the full NeuralNetProcessor for developers wh
 | BL-011 | File Ingestion | 🟢 Standard | OPEN | — |
 | BL-012 | Co-Capture Linking | 🟢 Standard | COMPLETE (v5.2) | — |
 | BL-013 | Swarm Token Budget | 🟢 Standard | OPEN | BL-005 |
-| BL-014 | Simplified API | 🟢 Standard | OPEN | — |
+| BL-014 | Simplified API | 🟢 Standard | COMPLETE (v5.3) | — |
 
 ---
 
