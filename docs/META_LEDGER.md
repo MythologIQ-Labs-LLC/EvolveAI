@@ -1898,13 +1898,185 @@ SHA256(content_hash + previous_hash) = 2164bddff682d30d0c8c91d49b36720ec455791ee
 
 ---
 
+---
+
+### Entry #48: PLAN v5.1
+
+**Timestamp**: 2026-03-18T13:15:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Content Hash**:
+```
+SHA256(plan-v5.1-bidirectional-thermodynamics.md) = 288141862bf0be9774f56a34017d9807a2aef7ce630f28d53bc33ea7c00c1d56
+```
+
+**Previous Hash**: 2164bddff682d30d0c8c91d49b36720ec455791ee624628822f223adee6d80d1
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 49c2357a837c8cfb26bcd310892a4da843d4da09d08555232186d3adc2fd7cb2
+```
+
+**Decision**: v5.1 Bidirectional Thermodynamics plan created. Two phases: (1) Weighted pinning hierarchy — PinningEvent enum with 4 tiers (Access/CrossReference/Corroboration/CryptoVerification), boost_saturation_weighted, record_access on processor. (2) Entropy injection — inject_entropy for fiber unpinning, record_conflict on processor. Makes the thermodynamic model bidirectional: objects can both crystallize and evaporate. 17 new tests.
+
+**Artifacts Created**:
+- docs/plan-v5.1-bidirectional-thermodynamics.md
+
+---
+
+---
+
+### Entry #49: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-18T13:30:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: VETO
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 57d297b8d7e2ddacc24a5855e20b513e51a418939dfe972dcbe143ee59e8e3f5
+```
+
+**Previous Hash**: 49c2357a837c8cfb26bcd310892a4da843d4da09d08555232186d3adc2fd7cb2
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = e0eb6dc92d683cb19d902b1f9c28515647de88a168b25f6663f788c2d9f4caa6
+```
+
+**Decision**: v5.1 VETOED. Section 4 Razor violation: facade.rs is at 250 lines, plan adds +23 lines (record_access + record_conflict + import) = 273. Plan must specify extraction strategy to stay under limit.
+
+---
+
+---
+
+### Entry #50: GATE TRIBUNAL (Revised)
+
+**Timestamp**: 2026-03-18T13:45:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 1fddaabf9ee0063573fd7a9a42fc0c06d69a21e0a77e7c3ce6f43d5b4bf8ebab
+```
+
+**Previous Hash**: e0eb6dc92d683cb19d902b1f9c28515647de88a168b25f6663f788c2d9f4caa6
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 116910e8e71d86aa1924056ba9c3dec56be84ca5c6b820a48cf2857ce849d707
+```
+
+**Decision**: v5.1 APPROVED after remediation. Phase 0 added: extract persistence to `processor/persist.rs` (~60 lines), freeing facade.rs to ~247 lines after all additions. Initial VETO (Entry #49) resolved. Shadow Genome failure pattern recorded. All six passes clean.
+
+---
+
+---
+
+### Entry #51: IMPLEMENTATION
+
+**Timestamp**: 2026-03-18T14:00:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist
+**Risk Grade**: L3
+
+**Files Created**:
+- crates/evolve-core/src/processor/persist.rs (69 lines — persistence extracted from facade)
+
+**Files Modified**:
+- crates/evolve-core/src/processor/facade.rs (record_access, record_conflict, persistence delegation)
+- crates/evolve-core/src/processor/mod.rs (added persist module)
+- crates/evolve-core/src/memory/decay.rs (pin_weight, boost_saturation_weighted, inject_entropy)
+- crates/evolve-core/src/memory/types.rs (PinningEvent enum)
+- crates/evolve-core/src/tiers/l2_graph.rs (get_mut)
+- crates/evolve-core/src/tiers/l3_vault.rs (get_mut)
+- crates/evolve-core/src/memory/tests.rs (9 new tests)
+- crates/evolve-core/src/processor/tests.rs (8 new tests)
+- docs/BACKLOG.md (BL-004 marked PARTIAL)
+
+**Content Hash**:
+```
+SHA256(implementation files) = 6136a5c80af47a68d172a044cf915bf0f01af15e8aeee764df1207e749360243
+```
+
+**Previous Hash**: 116910e8e71d86aa1924056ba9c3dec56be84ca5c6b820a48cf2857ce849d707
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = c2b32825cd05c3ffe1010fc942be0a6c28520a8b3e87a71ae03b7673d0c24313
+```
+
+**Decision**: v5.1 Bidirectional Thermodynamics implementation COMPLETE. All 3 phases:
+
+1. **Phase 0: Facade Extraction** — Persistence logic moved to `processor/persist.rs` (69 lines). Facade freed from 250→249 lines.
+2. **Phase 1: Weighted Pinning** — PinningEvent enum (Access/CrossReference/Corroboration/CryptoVerification). pin_weight, boost_saturation_weighted, record_access. CryptoVerification pins 15x faster than Access.
+3. **Phase 2: Entropy Injection** — inject_entropy unpins fibers. record_conflict. Disputed objects heat up and decay faster. Crystallization is reversible.
+
+**Test Results**: 129 tests pass (17 new)
+**BL-004 (CMVK Fiber Pinning)**: Prerequisites complete — PinningEvent + inject_entropy primitives ready.
+
+**Section 4 Razor Compliance**:
+- All files ≤ 250 lines (facade.rs = 249)
+- All functions ≤ 40 lines
+- No nested ternaries
+- Nesting depth ≤ 3
+
+---
+
+---
+
+### Entry #52: SESSION SEAL
+
+**Timestamp**: 2026-03-19T00:00:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: SEALED
+
+**Content Hash**:
+```
+SHA256(SYSTEM_STATE.md) = 1a9f94afe196d62f610755d7ab6b06f2095825946d5af12fa9d0382303f537fa
+```
+
+**Previous Hash**: c2b32825cd05c3ffe1010fc942be0a6c28520a8b3e87a71ae03b7673d0c24313
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 4e42afec33f9b275c5839eb40ca0cd412b019f476970e6afcc426ee70d6d155d
+```
+
+**Decision**: v5.1 Bidirectional Thermodynamics SUBSTANTIATED. Reality = Promise.
+
+**Verification Summary**:
+- Version: v4.0.0-alpha → v5.1.0 (feature: bidirectional thermodynamics)
+- Reality Audit: 10/10 planned deliverables exist, 0 missing, 0 unplanned
+- Tests: 129 pass, 0 fail (17 new)
+- Section 4: All files ≤ 249, all functions ≤ 12, nesting ≤ 2
+- Console artifacts: 0
+- TODO/FIXME: 0
+- BL-004 (CMVK Fiber Pinning): Primitives complete
+
+**Artifacts Updated**:
+- docs/SYSTEM_STATE.md
+- docs/META_LEDGER.md
+
+---
+
 ## Chain Status: SEALED
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Final Hash**: `2164bddff682d30d0c8c91d49b36720ec455791ee624628822f223adee6d80d1`
-**Blocks**: 47
-**Lifecycle**: RELEASED (v5.0.0)
-**Version**: v5.0.0
+**Final Hash**: `4e42afec33f9b275c5839eb40ca0cd412b019f476970e6afcc426ee70d6d155d`
+**Blocks**: 52
+**Lifecycle**: RELEASED (v5.1.0)
+**Version**: v5.1.0
 
 ---
 

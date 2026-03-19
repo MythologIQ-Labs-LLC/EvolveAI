@@ -212,3 +212,85 @@ fn test_should_prune_below_threshold() {
 fn test_should_not_prune_above_threshold() {
     assert!(!should_prune(0.5, 0.05));
 }
+
+// --- Weighted pinning tests (v5.1) ---
+
+#[test]
+fn test_pin_weight_ordering() {
+    let a = pin_weight(PinningEvent::Access);
+    let xr = pin_weight(PinningEvent::CrossReference);
+    let co = pin_weight(PinningEvent::Corroboration);
+    let cv = pin_weight(PinningEvent::CryptoVerification);
+    assert!(cv > xr);
+    assert_eq!(xr, co);
+    assert!(xr > a);
+}
+
+#[test]
+fn test_crypto_verification_pins_faster_than_access() {
+    let mut sa = 0.0_f32;
+    for _ in 0..10 {
+        sa = boost_saturation_weighted(sa, PinningEvent::Access);
+    }
+    let mut sv = 0.0_f32;
+    for _ in 0..2 {
+        sv = boost_saturation_weighted(sv, PinningEvent::CryptoVerification);
+    }
+    assert!(sv > sa);
+}
+
+#[test]
+fn test_cross_reference_pins_at_medium_weight() {
+    let mut sa = 0.0_f32;
+    let mut sx = 0.0_f32;
+    for _ in 0..5 {
+        sa = boost_saturation_weighted(sa, PinningEvent::Access);
+        sx = boost_saturation_weighted(sx, PinningEvent::CrossReference);
+    }
+    assert!(sx > sa);
+}
+
+#[test]
+fn test_boost_weighted_never_exceeds_one() {
+    let mut s = 0.0_f32;
+    for _ in 0..1000 {
+        s = boost_saturation_weighted(s, PinningEvent::CryptoVerification);
+    }
+    assert!(s <= 1.0);
+    assert!((s - 1.0).abs() < 1e-6);
+}
+
+// --- Entropy injection tests (v5.1) ---
+
+#[test]
+fn test_inject_entropy_reduces_saturation() {
+    let result = inject_entropy(0.8, 0.3);
+    assert!((result - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn test_inject_entropy_clamps_to_zero() {
+    let result = inject_entropy(0.2, 0.5);
+    assert!((result - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_inject_entropy_zero_severity_no_change() {
+    let result = inject_entropy(0.8, 0.0);
+    assert!((result - 0.8).abs() < 1e-6);
+}
+
+#[test]
+fn test_entropy_spikes_temperature() {
+    let old_t = temperature(0.8);
+    let new_sigma = inject_entropy(0.8, 0.3);
+    let new_t = temperature(new_sigma);
+    assert!(new_t > old_t);
+}
+
+#[test]
+fn test_entropy_accelerates_decay() {
+    let high_sat = calculate_decay(0, 60000, 60000, 0.8);
+    let low_sat = calculate_decay(0, 60000, 60000, inject_entropy(0.8, 0.5));
+    assert!(low_sat < high_sat);
+}

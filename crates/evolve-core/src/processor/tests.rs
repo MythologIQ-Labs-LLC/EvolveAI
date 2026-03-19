@@ -344,3 +344,132 @@ async fn test_self_optimization() {
     let qr = proc.query(&make_query("evolving memory"), 1000).await.unwrap();
     assert!(!qr.recall.memories.is_empty());
 }
+
+// --- Weighted pinning tests (v5.1) ---
+
+#[tokio::test]
+async fn test_record_access_boosts_saturation() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("pin me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+    assert_eq!(result.unit.saturation, 0.0);
+
+    let found = proc.record_access(&addr, PinningEvent::CryptoVerification);
+    assert!(found);
+
+    // Query to retrieve the unit and check saturation increased
+    let qr = proc.query(&make_query("pin me"), 1000).await.unwrap();
+    assert!(!qr.recall.memories.is_empty());
+    assert!(qr.recall.memories[0].unit.saturation > 0.0);
+}
+
+#[test]
+fn test_record_access_not_found() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let addr = UorAddress::from_content("nonexistent");
+    assert!(!proc.record_access(&addr, PinningEvent::Access));
+}
+
+#[tokio::test]
+async fn test_record_access_increments_count() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("count me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    proc.record_access(&addr, PinningEvent::Access);
+    proc.record_access(&addr, PinningEvent::Access);
+    proc.record_access(&addr, PinningEvent::Access);
+
+    let qr = proc.query(&make_query("count me"), 1000).await.unwrap();
+    assert_eq!(qr.recall.memories[0].unit.access_count, 3);
+}
+
+// --- Entropy injection tests (v5.1) ---
+
+#[tokio::test]
+async fn test_conflict_reduces_saturation() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("dispute me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Boost to σ≈0.8 via repeated crypto verifications
+    for _ in 0..12 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    let new_sat = proc.record_conflict(&addr, 0.3).unwrap();
+    assert!(new_sat < 0.8);
+}
+
+#[tokio::test]
+async fn test_conflict_evaporates_disputed_memory() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("evaporate me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Boost to moderate saturation
+    for _ in 0..5 {
+        proc.record_access(&addr, PinningEvent::CrossReference);
+    }
+
+    // Major conflict → σ drops to near 0
+    let new_sat = proc.record_conflict(&addr, 0.5).unwrap();
+    assert!(new_sat < 0.1);
+
+    // At σ≈0 with enough elapsed time, memory decays below prune threshold
+    let decay_weight = crate::memory::decay::calculate_decay(1000, 500_000, 60_000, new_sat);
+    assert!(crate::memory::decay::should_prune(decay_weight, 0.05));
+}
+
+#[tokio::test]
+async fn test_crystallized_memory_survives_minor_conflict() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("resilient", vec!["sensitive"]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Boost to full saturation
+    for _ in 0..100 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    let new_sat = proc.record_conflict(&addr, 0.03).unwrap();
+    assert!(new_sat > 0.95); // Still crystallized
+}
+
+#[tokio::test]
+async fn test_crystallized_memory_decrystallizes_on_major_conflict() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("fragile crystal", vec!["sensitive"]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Boost to full saturation
+    for _ in 0..100 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    let new_sat = proc.record_conflict(&addr, 0.2).unwrap();
+    assert!(new_sat < 0.95); // Below crystallization threshold
+}
+
+#[test]
+fn test_conflict_not_found() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let addr = UorAddress::from_content("nonexistent");
+    assert!(proc.record_conflict(&addr, 0.5).is_none());
+}

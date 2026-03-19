@@ -1,12 +1,13 @@
-use crate::chain::ledger::Ledger;
 use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
+use crate::memory::decay;
 use crate::memory::decoder;
 use crate::memory::encoder;
 use crate::memory::types::*;
+use crate::processor::persist;
 use crate::processor::types::{
     EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
-    QueryResult, Snapshot, SNAPSHOT_VERSION, tier_list,
+    QueryResult, Snapshot, tier_list,
 };
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::shadow::genome::ShadowGenome;
@@ -83,7 +84,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     ) -> Result<QueryResult, EngineError> {
         let start = std::time::Instant::now();
 
-        // Fast path: L3 exact match by content address (skip if tier-restricted away from L3)
         let allows_l3 = matches!(query.constraints.require_tier, None | Some(Tier::L3));
         if allows_l3 {
             if let Some(result) = self.try_l3_exact_match(&query.content, start) {
@@ -91,7 +91,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             }
         }
 
-        // Slow path: vector scan across tiers
         self.vector_scan_query(query, now, start).await
     }
 
@@ -128,53 +127,54 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    pub fn snapshot(&self, now: i64) -> Snapshot {
-        Snapshot {
-            version: SNAPSHOT_VERSION.to_string(),
-            created_at: now,
-            l2_nodes: self.l2.nodes_vec(),
-            l2_edges: self.l2.edges_map().clone(),
-            l3_entries: self.l3.entries_vec(),
-            l3_blocks: self.l3.ledger().blocks().to_vec(),
-            shadow_entries: self.shadow.export_entries(),
+    /// Record a pinning event, boosting the memory's saturation.
+    /// Searches L2 then L3 (L1 is ephemeral, not worth boosting).
+    pub fn record_access(&mut self, addr: &UorAddress, event: PinningEvent) -> bool {
+        if let Some(unit) = self.l2.get_mut(addr) {
+            unit.saturation = decay::boost_saturation_weighted(unit.saturation, event);
+            unit.access_count += 1;
+            return true;
         }
+        if let Some(unit) = self.l3.get_mut(addr) {
+            unit.saturation = decay::boost_saturation_weighted(unit.saturation, event);
+            unit.access_count += 1;
+            return true;
+        }
+        false
     }
 
-    pub fn restore(&mut self, snapshot: Snapshot) -> Result<(), PersistError> {
-        if snapshot.version != SNAPSHOT_VERSION {
-            return Err(PersistError::IncompatibleVersion {
-                expected: SNAPSHOT_VERSION.to_string(),
-                found: snapshot.version,
-            });
+    /// Record a conflict, injecting entropy to unpin fibers.
+    /// Returns the new saturation, or None if address not found.
+    pub fn record_conflict(&mut self, addr: &UorAddress, severity: f32) -> Option<f32> {
+        if let Some(unit) = self.l2.get_mut(addr) {
+            unit.saturation = decay::inject_entropy(unit.saturation, severity);
+            return Some(unit.saturation);
         }
-
-        let ledger = Ledger::from_blocks(snapshot.l3_blocks);
-        if !ledger.verify() {
-            return Err(PersistError::ChainIntegrityFailed);
+        if let Some(unit) = self.l3.get_mut(addr) {
+            unit.saturation = decay::inject_entropy(unit.saturation, severity);
+            return Some(unit.saturation);
         }
+        None
+    }
 
-        self.l2 = L2Graph::from_parts(snapshot.l2_nodes, snapshot.l2_edges);
-        self.l3 = L3Vault::from_parts(snapshot.l3_entries, ledger);
-        self.shadow.import_entries(snapshot.shadow_entries);
-        Ok(())
+    pub fn snapshot(&self, now: i64) -> Snapshot {
+        persist::snapshot(&self.l2, &self.l3, &self.shadow, now)
+    }
+
+    pub fn restore(&mut self, snap: Snapshot) -> Result<(), PersistError> {
+        persist::restore(&mut self.l2, &mut self.l3, &mut self.shadow, snap)
     }
 
     pub fn save_to_file(&self, path: &std::path::Path, now: i64) -> Result<(), PersistError> {
-        let snapshot = self.snapshot(now);
-        let json = serde_json::to_string_pretty(&snapshot)?;
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, &json)?;
-        std::fs::rename(&tmp, path)?;
-        Ok(())
+        persist::save_to_file(&self.l2, &self.l3, &self.shadow, path, now)
     }
 
     pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), PersistError> {
-        let json = std::fs::read_to_string(path)?;
-        let snapshot: Snapshot = serde_json::from_str(&json)?;
-        self.restore(snapshot)
+        persist::load_from_file(&mut self.l2, &mut self.l3, &mut self.shadow, path)
     }
 
-    /// O(1) L3 exact match by content address.
+    // --- Private query helpers ---
+
     fn try_l3_exact_match(
         &self,
         content: &str,
@@ -202,7 +202,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         })
     }
 
-    /// Vector scan across tiers (slow path).
     async fn vector_scan_query(
         &self,
         query: &Query,
@@ -234,17 +233,17 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     }
 
     fn collect_candidates(&self, query: &Query, now: i64) -> Vec<&MemoryUnit> {
-        let mut candidates: Vec<&MemoryUnit> = Vec::new();
         match query.constraints.require_tier {
-            Some(Tier::L1) => candidates.extend(self.l1.iter_units(now)),
-            Some(Tier::L2) => candidates.extend(self.l2.iter_units()),
-            Some(Tier::L3) => candidates.extend(self.l3.iter_units()),
+            Some(Tier::L1) => self.l1.iter_units(now).collect(),
+            Some(Tier::L2) => self.l2.iter_units().collect(),
+            Some(Tier::L3) => self.l3.iter_units().collect(),
             None => {
-                candidates.extend(self.l1.iter_units(now));
-                candidates.extend(self.l2.iter_units());
-                candidates.extend(self.l3.iter_units());
+                let mut c: Vec<&MemoryUnit> = Vec::new();
+                c.extend(self.l1.iter_units(now));
+                c.extend(self.l2.iter_units());
+                c.extend(self.l3.iter_units());
+                c
             }
         }
-        candidates
     }
 }

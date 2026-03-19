@@ -36,6 +36,11 @@ impl L3Vault {
         self.entries.get(addr)
     }
 
+    /// Get a mutable reference to an entry by address.
+    pub fn get_mut(&mut self, addr: &UorAddress) -> Option<&mut MemoryUnit> {
+        self.entries.get_mut(addr)
+    }
+
     /// Iterate over all stored units.
     pub fn iter_units(&self) -> impl Iterator<Item = &MemoryUnit> {
         self.entries.values()

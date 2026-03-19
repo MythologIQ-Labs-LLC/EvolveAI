@@ -1,68 +1,65 @@
 # System State
 
-**Generated**: 2026-03-18T12:45:00Z
+**Generated**: 2026-03-19T00:00:00Z
 **Phase**: SUBSTANTIATE
 **Status**: SEALED
-**Version**: v5.0.0
+**Version**: v5.1.0
 
 ---
 
-## evolve-core: 39 files, 7 modules, 112 tests
+## evolve-core: 40 files, 8 modules, 129 tests
 
 ```
 crates/evolve-core/src/
 ├── lib.rs                        # 7 modules
 ├── representation/               # 8 files, 16 tests
 │   ├── types.rs, engine.rs, similarity.rs, mock.rs
-│   ├── factory.rs                # EngineType enum + factory functions
-│   ├── ggcore.rs                 # GG-CORE adapter (#[cfg(feature = "ggcore")])
+│   ├── factory.rs, ggcore.rs
 │   └── tests.rs
-├── memory/                       # 6 files, 25 tests (v5.0: UorAddress, saturation, thermodynamic decay)
-├── chain/                        # 5 files, 12 tests (v5.0: BLAKE3 hash functions)
-├── tiers/                        # 6 files, 19 tests (v5.0: UorAddress keys, crystallization routing)
+├── memory/                       # 6 files, 34 tests (v5.1: weighted pinning, entropy injection)
+├── chain/                        # 5 files, 12 tests
+├── tiers/                        # 6 files, 19 tests
 ├── shadow/                       # 5 files, 11 tests
 ├── lifecycle/                    # 4 files, 12 tests
-└── processor/                    # 4 files, 17 tests (v5.0: L3 fast path, self-optimization)
+└── processor/                    # 5 files, 25 tests (v5.1: persist extracted, record_access/conflict)
 ```
 
-## v5.0 Changes: UOR Identity & Thermodynamic Decay
+## v5.1 Changes: Bidirectional Thermodynamics
 
 | Phase | Description | Key Change |
 |-------|-------------|------------|
-| 1 | Content-Addressed Identity | UorAddress(BLAKE3) replaces UorId(UUID) + content_hash |
-| 2 | Saturation-Driven Decay | λ_eff = λ_base × (1-σ) × ln(2); σ=1 → no decay |
-| 3 | L3 O(1) Address Lookup | get_by_address + query fast path |
+| 0 | Facade Extraction | Persistence → persist.rs (Section 4 remediation) |
+| 1 | Weighted Pinning | PinningEvent enum, pin_weight(), boost_saturation_weighted() |
+| 2 | Entropy Injection | inject_entropy(), record_conflict() — reversible crystallization |
 
-## Dependencies
+## Thermodynamic Primitives
 
-| Crate | Version | Purpose |
-|-------|---------|---------|
-| blake3 | 1 | **NEW v5.0**: Content-addressed identity (UOR standard) |
-| tokio | 1 | Async runtime |
-| serde + serde_json | 1 | Serialization |
-| uuid | 1 | Session IDs (no longer used for memory identity) |
-| chrono | 0.4 | Timestamps |
-| sha2 | 0.10 | Chain integrity (retained for backward compat) |
-| hex | 0.4 | Hex encoding |
-| thiserror | 1 | Error types |
-| tracing | 0.1 | Instrumentation |
+| Function | Purpose | Location |
+|----------|---------|----------|
+| `temperature(σ)` | T_ctx = (1-σ) × ln(2) | decay.rs |
+| `effective_lambda(λ, σ)` | λ_eff = λ_base × T_ctx | decay.rs |
+| `calculate_decay(...)` | w = e^(-λ_eff × elapsed) | decay.rs |
+| `pin_weight(event)` | Event → fiber pin weight | decay.rs |
+| `boost_saturation_weighted(σ, event)` | Cooling: σ increases by event weight | decay.rs |
+| `inject_entropy(σ, severity)` | Heating: σ decreases by severity | decay.rs |
 
-## Feature Flags
+## Pinning Hierarchy
 
-| Feature | Dependencies | Purpose |
-|---------|-------------|---------|
-| `default` | (none) | MockEngine only |
-| `ggcore` | gg-core, async-trait | Real ONNX embeddings via GG-CORE |
+| Event | Weight | Effect |
+|-------|--------|--------|
+| Access | 0.01 | Low — prevents spam crystallization |
+| CrossReference | 0.05 | Medium — relational evidence |
+| Corroboration | 0.05 | Medium — convergent evidence |
+| CryptoVerification | 0.15 | High — structural integrity |
 
 ## Section 4 Compliance
 
 | Check | Limit | Actual | Status |
 |-------|-------|--------|--------|
-| Max production file | 250 | 250 | PASS |
-| Max function lines | 40 | 37 | PASS |
+| Max production file | 250 | 249 | PASS |
+| Max function lines | 40 | 12 | PASS |
 | Max nesting depth | 3 | 2 | PASS |
 | Console artifacts | 0 | 0 | PASS |
-| Snapshot version | — | 5.0.0 | CURRENT |
 
 ---
 

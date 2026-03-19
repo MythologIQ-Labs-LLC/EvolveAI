@@ -46,6 +46,11 @@ impl L2Graph {
         self.nodes.get(addr)
     }
 
+    /// Get a mutable reference to a node by address.
+    pub fn get_mut(&mut self, addr: &UorAddress) -> Option<&mut MemoryUnit> {
+        self.nodes.get_mut(addr)
+    }
+
     /// Get outgoing edges from a node.
     pub fn edges_from(&self, addr: &UorAddress) -> &[Edge] {
         self.edges.get(addr).map_or(&[], Vec::as_slice)

@@ -67,6 +67,16 @@ pub enum Sensitivity {
     Restricted,
 }
 
+/// Events that pin fibers, increasing saturation.
+/// Weighted to prevent access spam from artificially crystallizing junk data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PinningEvent {
+    Access,
+    CrossReference,
+    Corroboration,
+    CryptoVerification,
+}
+
 /// Encoded memory unit stored in the tier system.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryUnit {
