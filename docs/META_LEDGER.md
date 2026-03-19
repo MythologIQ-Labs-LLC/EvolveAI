@@ -2094,13 +2094,134 @@ SHA256(commit + previous_hash) = 019c238556c8c941820c66cf8d725056064e11617c61520
 
 ---
 
-## Chain Status: DELIVERED
+---
+
+### Entry #54: PLAN v5.2
+
+**Timestamp**: 2026-03-19T00:25:00Z
+**Phase**: PLAN
+**Author**: Governor
+**Risk Grade**: L3
+
+**Decision**: v5.2 Associative Linking & Tier Promotion plan created. Three phases: (1) Query extraction from facade, (2) Co-capture linking (BL-012), (3) Saturation-driven L2→L3 promotion. Completes the self-optimization loop.
+
+---
+
+### Entry #55: GATE TRIBUNAL
+
+**Timestamp**: 2026-03-19T00:30:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L3
+**Verdict**: PASS
+
+**Content Hash**:
+```
+SHA256(AUDIT_REPORT.md) = 7122437120e908d383b43201883a851658f2027d28156e278ac8618c8aaf9bcd
+```
+
+**Previous Hash**: 019c238556c8c941820c66cf8d725056064e11617c6152000bed4ccd8660e78f
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = ef84b25d8f5761d1a17042b96b60ed46afa0f29f6adcc4d65140820901dede3b
+```
+
+**Decision**: v5.2 APPROVED. All six passes clean. Proactive query extraction (learning from v5.1 VETO) gives facade.rs ~46 lines headroom. No new dependencies. One pseudocode typo noted (non-blocking).
+
+---
+
+---
+
+### Entry #56: IMPLEMENTATION
+
+**Timestamp**: 2026-03-19T01:00:00Z
+**Phase**: IMPLEMENT
+**Author**: Specialist (Agent Team: Specialist + Observer + Devil's Advocate)
+**Risk Grade**: L3
+
+**Files Created**:
+- crates/evolve-core/src/processor/query.rs (102 lines — query logic extracted from facade)
+
+**Files Modified**:
+- crates/evolve-core/src/processor/facade.rs (session_log, co-capture linking, clear_session, tier promotion)
+- crates/evolve-core/src/processor/mod.rs (added query module)
+- crates/evolve-core/src/tiers/l2_graph.rs (link_to_session)
+- crates/evolve-core/src/tiers/tests.rs (3 new linking tests)
+- crates/evolve-core/src/processor/tests.rs (7 new tests: co-capture + promotion)
+- docs/BACKLOG.md (BL-012 marked COMPLETE)
+
+**Content Hash**:
+```
+SHA256(implementation files) = 910711ce10e73e0215fa44cad276a0df40e0f448bb75860234137160df66ae26
+```
+
+**Previous Hash**: ef84b25d8f5761d1a17042b96b60ed46afa0f29f6adcc4d65140820901dede3b
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = 7b8f9d19f747e277f2d331528f1fde9235c877f70c1a6288527ecc165d007d62
+```
+
+**Decision**: v5.2 Associative Linking & Tier Promotion COMPLETE. All 3 phases:
+
+1. **Phase 1: Query Extraction** — query helpers moved to processor/query.rs (102 lines). Facade freed to 212 lines.
+2. **Phase 2: Co-Capture Linking (BL-012)** — session_log tracks encoded addresses. link_to_session creates bidirectional edges weighted by temporal proximity. CrossReference pins on session peers.
+3. **Phase 3: Tier Promotion** — record_access promotes L2→L3 when σ≥0.95 (remove + store). Self-optimization loop complete.
+
+**Test Results**: 139 tests pass (10 new)
+**BL-012 (Co-Capture Linking)**: COMPLETE
+
+**Section 4 Razor Compliance**:
+- facade.rs: 212 lines (38 lines headroom)
+- query.rs: 102 lines
+- l2_graph.rs: 131 lines
+- All functions ≤ 40 lines
+
+---
+
+---
+
+### Entry #57: SESSION SEAL
+
+**Timestamp**: 2026-03-19T01:15:00Z
+**Phase**: SUBSTANTIATE
+**Author**: Judge
+**Risk Grade**: L3
+
+**Verdict**: SEALED
+
+**Content Hash**:
+```
+SHA256(SYSTEM_STATE.md) = 227b3b71377c6513ba5ac620afdef2f9d4a5c872f14905667a26f5cdc0156218
+```
+
+**Previous Hash**: 7b8f9d19f747e277f2d331528f1fde9235c877f70c1a6288527ecc165d007d62
+
+**Chain Hash**:
+```
+SHA256(content_hash + previous_hash) = c8cb1e781b2b064720b8738ccd06a3a040afdee74d94fa74343d1634fa2adc2e
+```
+
+**Decision**: v5.2 Associative Linking & Tier Promotion SUBSTANTIATED. Reality = Promise.
+
+**Verification Summary**:
+- Version: v5.1.0 → v5.2.0
+- Reality Audit: All 3 phase deliverables exist
+- Tests: 139 pass, 0 fail (10 new)
+- Section 4: facade.rs = 212 (38 lines headroom), query.rs = 102
+- Devil's Advocate: 5 risks evaluated, 2 mitigated (weight floor + documented atomicity)
+- BL-012: COMPLETE
+
+---
+
+## Chain Status: SEALED
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Final Hash**: `019c238556c8c941820c66cf8d725056064e11617c6152000bed4ccd8660e78f`
-**Blocks**: 53
-**Lifecycle**: DELIVERED (v5.1.0)
-**Version**: v5.1.0
+**Final Hash**: `c8cb1e781b2b064720b8738ccd06a3a040afdee74d94fa74343d1634fa2adc2e`
+**Blocks**: 57
+**Lifecycle**: RELEASED (v5.2.0)
+**Version**: v5.2.0
 
 ---
 

@@ -1,63 +1,52 @@
 # System State
 
-**Generated**: 2026-03-19T00:00:00Z
+**Generated**: 2026-03-19T01:15:00Z
 **Phase**: SUBSTANTIATE
 **Status**: SEALED
-**Version**: v5.1.0
+**Version**: v5.2.0
 
 ---
 
-## evolve-core: 40 files, 8 modules, 129 tests
+## evolve-core: 41 files, 8 modules, 139 tests
 
 ```
 crates/evolve-core/src/
 ├── lib.rs                        # 7 modules
 ├── representation/               # 8 files, 16 tests
-│   ├── types.rs, engine.rs, similarity.rs, mock.rs
-│   ├── factory.rs, ggcore.rs
-│   └── tests.rs
-├── memory/                       # 6 files, 34 tests (v5.1: weighted pinning, entropy injection)
+├── memory/                       # 6 files, 34 tests
 ├── chain/                        # 5 files, 12 tests
-├── tiers/                        # 6 files, 19 tests
+├── tiers/                        # 6 files, 22 tests (v5.2: link_to_session, weight floor)
 ├── shadow/                       # 5 files, 11 tests
 ├── lifecycle/                    # 4 files, 12 tests
-└── processor/                    # 5 files, 25 tests (v5.1: persist extracted, record_access/conflict)
+└── processor/                    # 6 files, 32 tests (v5.2: query.rs extracted, co-capture, promotion)
 ```
 
-## v5.1 Changes: Bidirectional Thermodynamics
+## v5.2 Changes: Associative Linking & Tier Promotion
 
 | Phase | Description | Key Change |
 |-------|-------------|------------|
-| 0 | Facade Extraction | Persistence → persist.rs (Section 4 remediation) |
-| 1 | Weighted Pinning | PinningEvent enum, pin_weight(), boost_saturation_weighted() |
-| 2 | Entropy Injection | inject_entropy(), record_conflict() — reversible crystallization |
+| 1 | Query Extraction | query.rs (102 lines) — facade freed to 212 lines |
+| 2 | Co-Capture Linking (BL-012) | link_to_session + session_log + CrossReference pins |
+| 3 | Tier Promotion | L2→L3 at σ≥0.95 in record_access() |
 
-## Thermodynamic Primitives
+## Self-Optimization Loop (Proven)
 
-| Function | Purpose | Location |
-|----------|---------|----------|
-| `temperature(σ)` | T_ctx = (1-σ) × ln(2) | decay.rs |
-| `effective_lambda(λ, σ)` | λ_eff = λ_base × T_ctx | decay.rs |
-| `calculate_decay(...)` | w = e^(-λ_eff × elapsed) | decay.rs |
-| `pin_weight(event)` | Event → fiber pin weight | decay.rs |
-| `boost_saturation_weighted(σ, event)` | Cooling: σ increases by event weight | decay.rs |
-| `inject_entropy(σ, severity)` | Heating: σ decreases by severity | decay.rs |
+```
+encode → co-capture link → CrossReference pin → σ rises → promote L2→L3 → O(1) lookup
+```
 
-## Pinning Hierarchy
+## Devil's Advocate Mitigations Applied
 
-| Event | Weight | Effect |
-|-------|--------|--------|
-| Access | 0.01 | Low — prevents spam crystallization |
-| CrossReference | 0.05 | Medium — relational evidence |
-| Corroboration | 0.05 | Medium — convergent evidence |
-| CryptoVerification | 0.15 | High — structural integrity |
+- Weight floor (0.05) in link_to_session — bounds O(K²) edge growth to ~19s temporal radius
+- Edge orphan cleanup verified (L2Graph::remove cleans both directions)
+- Promotion atomicity guaranteed by Rust's &mut self exclusivity
 
 ## Section 4 Compliance
 
 | Check | Limit | Actual | Status |
 |-------|-------|--------|--------|
-| Max production file | 250 | 249 | PASS |
-| Max function lines | 40 | 12 | PASS |
+| Max production file | 250 | 212 (facade.rs) | PASS |
+| Max function lines | 40 | 15 (link_to_session) | PASS |
 | Max nesting depth | 3 | 2 | PASS |
 | Console artifacts | 0 | 0 | PASS |
 

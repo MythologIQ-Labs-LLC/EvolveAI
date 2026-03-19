@@ -473,3 +473,125 @@ fn test_conflict_not_found() {
     let addr = UorAddress::from_content("nonexistent");
     assert!(proc.record_conflict(&addr, 0.5).is_none());
 }
+
+// --- Co-capture linking tests (v5.2) ---
+
+#[tokio::test]
+async fn test_encode_creates_session_edges() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("fact one", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("fact two", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("fact three", vec![]), 1002).await.unwrap();
+
+    assert!(proc.stats().l2_edges > 0);
+}
+
+#[tokio::test]
+async fn test_encode_cross_reference_pins_peers() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let r1 = proc.encode(&make_input("first memory", vec![]), 1000).await.unwrap();
+    let addr1 = r1.unit.address.clone();
+    assert_eq!(r1.unit.saturation, 0.0);
+
+    // Second encode triggers CrossReference pin on first
+    proc.encode(&make_input("second memory", vec![]), 1001).await.unwrap();
+
+    let qr = proc.query(&make_query("first memory"), 1001).await.unwrap();
+    assert!(qr.recall.memories[0].unit.saturation > 0.0);
+    let _ = addr1; // used for clarity
+}
+
+#[tokio::test]
+async fn test_clear_session_resets() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("before clear", vec![]), 1000).await.unwrap();
+    let edges_before = proc.stats().l2_edges;
+
+    proc.clear_session();
+
+    proc.encode(&make_input("after clear", vec![]), 2000).await.unwrap();
+    // No new edges — session was cleared, no peers to link
+    assert_eq!(proc.stats().l2_edges, edges_before);
+}
+
+// --- Tier promotion tests (v5.2) ---
+
+#[tokio::test]
+async fn test_promotion_l2_to_l3_on_crystallization() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("promote me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+    assert_eq!(result.decision.tier, Tier::L2);
+    assert_eq!(proc.stats().l2_nodes, 1);
+    assert_eq!(proc.stats().l3_size, 0);
+
+    // Boost until promotion triggers (σ≥0.95)
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // Memory should have promoted to L3
+    assert_eq!(proc.stats().l2_nodes, 0);
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[tokio::test]
+async fn test_promoted_memory_queryable_by_address() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("will promote", vec![]), 1000).await.unwrap();
+
+    // Promote via repeated access
+    let addr = UorAddress::from_content("will promote");
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // O(1) L3 exact match should work now
+    let qr = proc.query(&make_query("will promote"), 2000).await.unwrap();
+    assert_eq!(qr.recall.memories.len(), 1);
+    assert_eq!(qr.recall.metrics.tiers_queried, vec![Tier::L3]);
+}
+
+#[tokio::test]
+async fn test_promotion_removes_from_l2() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("stays", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("promotes", vec![]), 1001).await.unwrap();
+    assert_eq!(proc.stats().l2_nodes, 2);
+
+    let addr = UorAddress::from_content("promotes");
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert_eq!(proc.stats().l2_nodes, 1); // Only "stays" remains
+}
+
+#[tokio::test]
+async fn test_no_promotion_below_threshold() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("stay in l2", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Access events have low weight (0.01) — won't reach 0.95
+    for _ in 0..10 {
+        proc.record_access(&addr, PinningEvent::Access);
+    }
+
+    assert_eq!(proc.stats().l2_nodes, 1); // Still in L2
+    assert_eq!(proc.stats().l3_size, 0);
+}

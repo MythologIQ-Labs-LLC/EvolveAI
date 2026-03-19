@@ -1,13 +1,13 @@
 use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
 use crate::memory::decay;
-use crate::memory::decoder;
 use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::persist;
+use crate::processor::query as query_mod;
 use crate::processor::types::{
     EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
-    QueryResult, Snapshot, tier_list,
+    QueryResult, Snapshot,
 };
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::shadow::genome::ShadowGenome;
@@ -26,6 +26,7 @@ pub struct MemoryProcessor<E: RepresentationEngine> {
     l3: L3Vault,
     shadow: ShadowGenome,
     lifecycle: Orchestrator,
+    session_log: Vec<(UorAddress, i64)>,
 }
 
 impl<E: RepresentationEngine> MemoryProcessor<E> {
@@ -43,6 +44,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             lifecycle,
             engine,
             config,
+            session_log: Vec::new(),
         }
     }
 
@@ -69,7 +71,12 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 
         match decision.tier {
             Tier::L1 => self.l1.insert(unit.clone(), now),
-            Tier::L2 => self.l2.insert(unit.clone()),
+            Tier::L2 => {
+                self.l2.insert(unit.clone());
+                self.l2.link_to_session(&unit.address, &self.session_log, now);
+                self.pin_session_peers(&unit.address, now);
+                self.session_log.push((unit.address.clone(), now));
+            }
             Tier::L3 => self.l3.store(unit.clone()),
         }
 
@@ -86,12 +93,22 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 
         let allows_l3 = matches!(query.constraints.require_tier, None | Some(Tier::L3));
         if allows_l3 {
-            if let Some(result) = self.try_l3_exact_match(&query.content, start) {
+            if let Some(result) = query_mod::try_l3_exact_match(&self.l3, &query.content, start) {
                 return Ok(result);
             }
         }
 
-        self.vector_scan_query(query, now, start).await
+        query_mod::vector_scan(
+            &self.engine,
+            &self.config.decoder,
+            &self.l1,
+            &self.l2,
+            &self.l3,
+            query,
+            now,
+            start,
+        )
+        .await
     }
 
     pub fn stats(&self) -> ProcessorStats {
@@ -127,12 +144,20 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         Ok(())
     }
 
-    /// Record a pinning event, boosting the memory's saturation.
-    /// Searches L2 then L3 (L1 is ephemeral, not worth boosting).
+    pub fn clear_session(&mut self) {
+        self.session_log.clear();
+    }
+
+    /// Record a pinning event, boosting saturation. Promotes L2→L3 at σ≥0.95.
     pub fn record_access(&mut self, addr: &UorAddress, event: PinningEvent) -> bool {
         if let Some(unit) = self.l2.get_mut(addr) {
             unit.saturation = decay::boost_saturation_weighted(unit.saturation, event);
             unit.access_count += 1;
+            if unit.saturation >= 0.95 {
+                if let Some(promoted) = self.l2.remove(addr) {
+                    self.l3.store(promoted);
+                }
+            }
             return true;
         }
         if let Some(unit) = self.l3.get_mut(addr) {
@@ -141,6 +166,17 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             return true;
         }
         false
+    }
+
+    fn pin_session_peers(&mut self, _new_addr: &UorAddress, _now: i64) {
+        for (peer_addr, _) in &self.session_log {
+            if let Some(unit) = self.l2.get_mut(peer_addr) {
+                unit.saturation = decay::boost_saturation_weighted(
+                    unit.saturation,
+                    PinningEvent::CrossReference,
+                );
+            }
+        }
     }
 
     /// Record a conflict, injecting entropy to unpin fibers.
@@ -173,77 +209,4 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         persist::load_from_file(&mut self.l2, &mut self.l3, &mut self.shadow, path)
     }
 
-    // --- Private query helpers ---
-
-    fn try_l3_exact_match(
-        &self,
-        content: &str,
-        start: std::time::Instant,
-    ) -> Option<QueryResult> {
-        let query_address = UorAddress::from_content(content);
-        let unit = self.l3.get_by_address(&query_address)?;
-        let elapsed = start.elapsed().as_millis() as u64;
-
-        Some(QueryResult {
-            recall: RecallResult {
-                memories: vec![ScoredMemory {
-                    unit: unit.clone(),
-                    relevance_score: 1.0,
-                    decayed_weight: 1.0,
-                }],
-                metrics: RecallMetrics {
-                    latency_ms: elapsed,
-                    tiers_queried: vec![Tier::L3],
-                    candidates_evaluated: 1,
-                    decay_filtered: 0,
-                },
-            },
-            latency_ms: elapsed,
-        })
-    }
-
-    async fn vector_scan_query(
-        &self,
-        query: &Query,
-        now: i64,
-        start: std::time::Instant,
-    ) -> Result<QueryResult, EngineError> {
-        let rep = self.engine.encode(&query.content).await?;
-        let query_embedding = rep.as_vector();
-        let candidates = self.collect_candidates(query, now);
-        let tiers_queried = tier_list(query.constraints.require_tier);
-        let total_candidates = candidates.len();
-
-        let memories = decoder::decode(&candidates, &query_embedding, now, &self.config.decoder);
-        let decay_filtered = total_candidates - memories.len();
-        let elapsed = start.elapsed().as_millis() as u64;
-
-        Ok(QueryResult {
-            recall: RecallResult {
-                memories,
-                metrics: RecallMetrics {
-                    latency_ms: elapsed,
-                    tiers_queried,
-                    candidates_evaluated: total_candidates,
-                    decay_filtered,
-                },
-            },
-            latency_ms: elapsed,
-        })
-    }
-
-    fn collect_candidates(&self, query: &Query, now: i64) -> Vec<&MemoryUnit> {
-        match query.constraints.require_tier {
-            Some(Tier::L1) => self.l1.iter_units(now).collect(),
-            Some(Tier::L2) => self.l2.iter_units().collect(),
-            Some(Tier::L3) => self.l3.iter_units().collect(),
-            None => {
-                let mut c: Vec<&MemoryUnit> = Vec::new();
-                c.extend(self.l1.iter_units(now));
-                c.extend(self.l2.iter_units());
-                c.extend(self.l3.iter_units());
-                c
-            }
-        }
-    }
 }

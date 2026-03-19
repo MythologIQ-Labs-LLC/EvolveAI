@@ -286,7 +286,7 @@ Create a simplified API layer over the full NeuralNetProcessor for developers wh
 | BL-009 | SLO / Error Budgets | 🟡 High | OPEN | — |
 | BL-010 | Cognitive Profile | 🟢 Standard | OPEN | — |
 | BL-011 | File Ingestion | 🟢 Standard | OPEN | — |
-| BL-012 | Co-Capture Linking | 🟢 Standard | OPEN | — |
+| BL-012 | Co-Capture Linking | 🟢 Standard | COMPLETE (v5.2) | — |
 | BL-013 | Swarm Token Budget | 🟢 Standard | OPEN | BL-005 |
 | BL-014 | Simplified API | 🟢 Standard | OPEN | — |
 

@@ -190,3 +190,69 @@ fn test_l3_vault_iter_units() {
     vault.store(make_unit("vi2", vec![], 32));
     assert_eq!(vault.iter_units().count(), 2);
 }
+
+// --- Co-capture linking tests (v5.2) ---
+
+#[test]
+fn test_link_to_session_creates_bidirectional_edges() {
+    let mut graph = l2_graph::L2Graph::new();
+    let u1 = make_unit("s1", vec![], 32);
+    let u2 = make_unit("s2", vec![], 32);
+    let u3 = make_unit("s3", vec![], 32);
+    let a1 = u1.address.clone();
+    let a2 = u2.address.clone();
+    let a3 = u3.address.clone();
+
+    graph.insert(u1);
+    let session = vec![];
+    graph.link_to_session(&a1, &session, 1000);
+
+    graph.insert(u2);
+    let session = vec![(a1.clone(), 1000)];
+    graph.link_to_session(&a2, &session, 1001);
+
+    graph.insert(u3);
+    let session = vec![(a1.clone(), 1000), (a2.clone(), 1001)];
+    graph.link_to_session(&a3, &session, 1002);
+
+    // A1↔A2, A1↔A3, A2↔A3 = 6 directed edges
+    assert_eq!(graph.edge_count(), 6);
+    assert_eq!(graph.neighbors(&a1).len(), 2);
+    assert_eq!(graph.neighbors(&a3).len(), 2);
+}
+
+#[test]
+fn test_link_to_session_weight_decreases_with_gap() {
+    let mut graph = l2_graph::L2Graph::new();
+    let u1 = make_unit("close", vec![], 32);
+    let u2 = make_unit("far", vec![], 32);
+    let u3 = make_unit("new", vec![], 32);
+    let a1 = u1.address.clone();
+    let a2 = u2.address.clone();
+    let a3 = u3.address.clone();
+
+    graph.insert(u1);
+    graph.insert(u2);
+    graph.insert(u3);
+
+    // a1 at t=9990 (10ms gap), a2 at t=0 (10s gap)
+    let session = vec![(a1.clone(), 9990), (a2.clone(), 0)];
+    graph.link_to_session(&a3, &session, 10000);
+
+    let close_edge = &graph.edges_from(&a3)[0]; // a1 is first in session
+    let far_edge = &graph.edges_from(&a3)[1];   // a2 is second
+    assert!(close_edge.weight > far_edge.weight);
+}
+
+#[test]
+fn test_link_to_session_skips_missing_peers() {
+    let mut graph = l2_graph::L2Graph::new();
+    let u1 = make_unit("exists", vec![], 32);
+    let a1 = u1.address.clone();
+    graph.insert(u1);
+
+    let missing = UorAddress::from_content("removed");
+    let session = vec![(missing, 1000)];
+    graph.link_to_session(&a1, &session, 2000);
+    assert_eq!(graph.edge_count(), 0);
+}
