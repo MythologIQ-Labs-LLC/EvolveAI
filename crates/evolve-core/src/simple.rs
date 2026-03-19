@@ -109,6 +109,12 @@ impl SimpleMemory {
         self.processor.clear_session();
     }
 
+    /// Get a cognitive profile of the memory system's knowledge state.
+    pub fn profile(&self) -> crate::processor::profile::CognitiveProfile {
+        let now = chrono::Utc::now().timestamp_millis();
+        self.processor.profile(now)
+    }
+
     /// Get the current SLO report.
     pub fn slo_report(&self) -> crate::processor::slo::SloReport {
         self.processor.slo_report()
@@ -194,6 +200,16 @@ mod tests {
         let mem = SimpleMemory::new();
         let results = mem.search("anything", 10).await.unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_simple_profile() {
+        let mut mem = SimpleMemory::new();
+        mem.add("knowledge about rust").await.unwrap();
+        mem.add_tagged("api key", vec!["sensitive".into()]).await.unwrap();
+        let p = mem.profile();
+        assert_eq!(p.total_memories, 2);
+        assert!(p.to_summary().contains("Memories: 2"));
     }
 
     #[tokio::test]

@@ -698,3 +698,80 @@ async fn test_processor_slo_no_violations_on_normal_queries() {
     assert_eq!(report.violation_count, 0);
     assert!(!report.circuit_open);
 }
+
+// --- Cognitive profile tests (v5.5) ---
+
+#[test]
+fn test_profile_empty_system() {
+    let engine = MockEngine::new(32);
+    let proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let p = proc.profile(1000);
+    assert_eq!(p.total_memories, 0);
+    assert!((p.avg_saturation - 0.0).abs() < 1e-6);
+    assert_eq!(p.crystallized_count, 0);
+}
+
+#[tokio::test]
+async fn test_profile_counts_tiers() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("normal data", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("secret data", vec!["sensitive"]), 1000).await.unwrap();
+    let p = proc.profile(1000);
+    assert!(p.l2_count > 0 || p.l1_count > 0);
+    assert!(p.l3_count > 0);
+    assert_eq!(p.total_memories, p.l1_count + p.l2_count + p.l3_count);
+}
+
+#[tokio::test]
+async fn test_profile_avg_saturation() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("boost me", vec![]), 1000).await.unwrap();
+    proc.record_access(&result.unit.address, PinningEvent::CryptoVerification);
+    let p = proc.profile(1000);
+    assert!(p.avg_saturation > 0.0);
+}
+
+#[tokio::test]
+async fn test_profile_crystallized_count() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("crystallize me", vec![]), 1000).await.unwrap();
+    for _ in 0..25 {
+        proc.record_access(&result.unit.address, PinningEvent::CryptoVerification);
+    }
+    let p = proc.profile(1000);
+    assert!(p.crystallized_count > 0);
+}
+
+#[tokio::test]
+async fn test_profile_top_tags() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("tagged1", vec!["science"]), 1000).await.unwrap();
+    proc.encode(&make_input("tagged2", vec!["science"]), 1001).await.unwrap();
+    proc.encode(&make_input("tagged3", vec!["art"]), 1002).await.unwrap();
+    let p = proc.profile(1003);
+    assert!(!p.top_tags.is_empty());
+    assert_eq!(p.top_tags[0].0, "science");
+    assert_eq!(p.top_tags[0].1, 2);
+}
+
+#[test]
+fn test_profile_to_summary_readable() {
+    let p = crate::processor::profile::CognitiveProfile {
+        total_memories: 5,
+        l1_count: 1,
+        l2_count: 3,
+        l3_count: 1,
+        edge_count: 4,
+        avg_saturation: 0.42,
+        crystallized_count: 1,
+        top_tags: vec![("test".to_string(), 3)],
+    };
+    let summary = p.to_summary();
+    assert!(summary.contains("Memories: 5"));
+    assert!(summary.contains("Crystallized: 1"));
+    assert!(summary.contains("42.0%"));
+}

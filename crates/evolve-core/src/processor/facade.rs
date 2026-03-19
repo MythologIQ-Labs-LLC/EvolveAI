@@ -6,6 +6,7 @@ use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::persist;
 use crate::processor::query as query_mod;
+use crate::processor::profile::{self, CognitiveProfile};
 use crate::processor::slo::{SloReport, SloSample, SloTracker};
 use crate::processor::types::{
     EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
@@ -117,6 +118,10 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 
         self.record_slo_sample(&result);
         Ok(result)
+    }
+
+    pub fn profile(&self, now: i64) -> CognitiveProfile {
+        profile::compute(&self.l1, &self.l2, &self.l3, now, 10)
     }
 
     pub fn slo_report(&self) -> SloReport {
