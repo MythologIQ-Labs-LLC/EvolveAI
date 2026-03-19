@@ -13,6 +13,7 @@ fn make_input(content: &str, tags: Vec<&str>) -> RawInput {
             source: None,
             priority: Priority::Normal,
             sensitivity: Sensitivity::Public,
+            ..Default::default()
         },
     }
 }
@@ -844,4 +845,117 @@ async fn test_ingest_file_nonexistent_returns_error() {
     let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
     let result = proc.ingest_file(std::path::Path::new("/nonexistent/file.txt"), vec![], 1000).await;
     assert!(result.is_err());
+}
+
+// --- Zero-trust crystallization tests (v5.7) ---
+
+use crate::processor::trust::CrystallizationPolicy;
+
+#[tokio::test]
+async fn test_require_approval_blocks_auto_promotion() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("guard me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // σ > 0.95 but memory should NOT be promoted (guarded)
+    assert!(proc.stats().l2_nodes > 0 || proc.stats().l1_size > 0);
+    assert_eq!(proc.stats().l3_size, 0);
+}
+
+#[tokio::test]
+async fn test_approve_crystallization_promotes() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("approve me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert!(proc.approve_crystallization(&addr));
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[tokio::test]
+async fn test_approve_crystallization_rejects_low_sigma() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("too young", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    proc.record_access(&addr, PinningEvent::Access);
+    assert!(!proc.approve_crystallization(&addr));
+}
+
+#[tokio::test]
+async fn test_auto_policy_still_works() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::Auto;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("auto promote", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[test]
+fn test_default_policy_is_auto_for_compat() {
+    let config = ProcessorConfig::default();
+    assert_eq!(config.crystallization, CrystallizationPolicy::Auto);
+}
+
+// --- Source provenance tests (v5.7) ---
+
+use crate::memory::types::TrustLevel;
+
+#[test]
+fn test_unverified_starts_at_zero() {
+    assert!((TrustLevel::Unverified.initial_saturation() - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_user_reviewed_starts_higher() {
+    assert!((TrustLevel::UserReviewed.initial_saturation() - 0.1).abs() < 1e-6);
+}
+
+#[test]
+fn test_verified_starts_highest() {
+    assert!((TrustLevel::Verified.initial_saturation() - 0.3).abs() < 1e-6);
+}
+
+#[tokio::test]
+async fn test_encode_respects_trust_level() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let input = RawInput {
+        content: "verified fact".to_string(),
+        content_type: ContentType::Text,
+        metadata: InputMetadata {
+            trust: TrustLevel::UserReviewed,
+            ..Default::default()
+        },
+    };
+    let result = proc.encode(&input, 1000).await.unwrap();
+    assert!((result.unit.saturation - 0.1).abs() < 1e-6);
 }

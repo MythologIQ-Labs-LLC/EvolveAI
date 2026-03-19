@@ -3,6 +3,7 @@ use crate::memory::decoder::DecoderConfig;
 use crate::memory::encoder::EncoderConfig;
 use crate::memory::types::{MemoryUnit, RecallResult, Tier, UorAddress};
 use crate::processor::slo::SloThresholds;
+use crate::processor::trust::CrystallizationPolicy;
 use crate::shadow::interceptor::InterceptorConfig;
 use crate::shadow::types::ShadowEntry;
 use crate::tiers::l2_graph::Edge;
@@ -64,6 +65,7 @@ pub struct ProcessorConfig {
     pub l1_ttl_ms: i64,
     pub l1_max_size: usize,
     pub slo: SloThresholds,
+    pub crystallization: CrystallizationPolicy,
 }
 
 impl Default for ProcessorConfig {
@@ -76,6 +78,7 @@ impl Default for ProcessorConfig {
             l1_ttl_ms: 300_000,
             l1_max_size: 1000,
             slo: SloThresholds::default(),
+            crystallization: CrystallizationPolicy::Auto,
         }
     }
 }

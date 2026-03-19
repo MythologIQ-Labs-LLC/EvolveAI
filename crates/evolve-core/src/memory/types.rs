@@ -45,6 +45,8 @@ pub struct InputMetadata {
     pub source: Option<String>,
     pub priority: Priority,
     pub sensitivity: Sensitivity,
+    #[serde(default)]
+    pub trust: TrustLevel,
 }
 
 /// Processing priority level.
@@ -65,6 +67,25 @@ pub enum Sensitivity {
     Internal,
     Confidential,
     Restricted,
+}
+
+/// Trust classification for incoming data.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrustLevel {
+    #[default]
+    Unverified,
+    UserReviewed,
+    Verified,
+}
+
+impl TrustLevel {
+    pub fn initial_saturation(&self) -> f32 {
+        match self {
+            Self::Unverified => 0.0,
+            Self::UserReviewed => 0.1,
+            Self::Verified => 0.3,
+        }
+    }
 }
 
 /// Events that pin fibers, increasing saturation.

@@ -279,8 +279,8 @@ Create a simplified API layer over the full NeuralNetProcessor for developers wh
 | BL-002 | Per-Phase Policy Interception | 🔴 Critical | OPEN | BL-001 |
 | BL-003 | Three-Mode Gating | 🔴 Critical | OPEN | BL-001 |
 | BL-004 | CMVK Fiber Pinning | 🔴 Critical | PARTIAL (v5.1 — primitives complete) | plan-v5.0 |
-| BL-005 | Trust Scoring | 🟡 High | OPEN | BL-001 |
-| BL-006 | L3 Approval Workflows | 🟡 High | OPEN | — |
+| BL-005 | Trust Scoring (Source Provenance) | 🟡 High | COMPLETE (v5.7) | — |
+| BL-006 | L3 Crystallization Guard | 🟡 High | COMPLETE (v5.7) | — |
 | BL-007 | Rego Policy Export | 🟡 High | OPEN | BL-001 |
 | BL-008 | Shapley Fault Attribution | 🟡 High | OPEN | BL-005 |
 | BL-009 | SLO / Error Budgets | 🟡 High | COMPLETE (v5.4) | — |

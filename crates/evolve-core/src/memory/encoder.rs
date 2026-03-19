@@ -37,7 +37,7 @@ pub async fn encode<E: RepresentationEngine>(
         created_at: now,
         last_accessed: now,
         access_count: 0,
-        saturation: 0.0,
+        saturation: input.metadata.trust.initial_saturation(),
         metadata: UnitMetadata {
             tags: input.metadata.tags.clone(),
             source: input.metadata.source.clone(),

@@ -1,7 +1,6 @@
 use std::sync::Mutex;
 use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
-use crate::memory::decay;
 use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::persist;
@@ -9,6 +8,7 @@ use crate::processor::query as query_mod;
 use crate::processor::ingest;
 use crate::processor::profile::{self, CognitiveProfile};
 use crate::processor::slo::{SloReport, SloSample, SloTracker};
+use crate::processor::trust;
 use crate::processor::types::{
     EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
     QueryResult, Snapshot,
@@ -180,49 +180,27 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         self.session_log.clear();
     }
 
-    /// Record a pinning event, boosting saturation. Promotes L2→L3 at σ≥0.95.
+    /// Record a pinning event, boosting saturation. Promotes L2->L3 per policy.
     pub fn record_access(&mut self, addr: &UorAddress, event: PinningEvent) -> bool {
-        if let Some(unit) = self.l2.get_mut(addr) {
-            unit.saturation = decay::boost_saturation_weighted(unit.saturation, event);
-            unit.access_count += 1;
-            if unit.saturation >= 0.95 {
-                if let Some(promoted) = self.l2.remove(addr) {
-                    self.l3.store(promoted);
-                }
-            }
-            return true;
-        }
-        if let Some(unit) = self.l3.get_mut(addr) {
-            unit.saturation = decay::boost_saturation_weighted(unit.saturation, event);
-            unit.access_count += 1;
-            return true;
-        }
-        false
+        trust::record_access(
+            &mut self.l2, &mut self.l3, addr, event,
+            self.config.crystallization,
+        )
     }
 
     fn pin_session_peers(&mut self, _new_addr: &UorAddress, _now: i64) {
-        for (peer_addr, _) in &self.session_log {
-            if let Some(unit) = self.l2.get_mut(peer_addr) {
-                unit.saturation = decay::boost_saturation_weighted(
-                    unit.saturation,
-                    PinningEvent::CrossReference,
-                );
-            }
-        }
+        trust::pin_session_peers(&mut self.l2, &self.session_log);
     }
 
     /// Record a conflict, injecting entropy to unpin fibers.
     /// Returns the new saturation, or None if address not found.
     pub fn record_conflict(&mut self, addr: &UorAddress, severity: f32) -> Option<f32> {
-        if let Some(unit) = self.l2.get_mut(addr) {
-            unit.saturation = decay::inject_entropy(unit.saturation, severity);
-            return Some(unit.saturation);
-        }
-        if let Some(unit) = self.l3.get_mut(addr) {
-            unit.saturation = decay::inject_entropy(unit.saturation, severity);
-            return Some(unit.saturation);
-        }
-        None
+        trust::record_conflict(&mut self.l2, &mut self.l3, addr, severity)
+    }
+
+    /// Explicitly approve crystallization (L2->L3) for a unit at σ>=0.95.
+    pub fn approve_crystallization(&mut self, addr: &UorAddress) -> bool {
+        trust::approve_crystallization(&mut self.l2, &mut self.l3, addr)
     }
 
     pub fn snapshot(&self, now: i64) -> Snapshot {

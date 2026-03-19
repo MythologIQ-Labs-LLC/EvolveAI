@@ -83,6 +83,7 @@ pub async fn ingest_text<E: RepresentationEngine>(
                 source: Some(format!("{}#chunk-{}", source, i)),
                 priority: Priority::Normal,
                 sensitivity: Sensitivity::Public,
+                ..Default::default()
             },
         };
         let result = processor.encode(&input, now).await?;

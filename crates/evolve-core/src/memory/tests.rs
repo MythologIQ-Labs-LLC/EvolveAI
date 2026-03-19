@@ -12,6 +12,7 @@ fn make_raw_input(content: &str, tags: Vec<&str>) -> RawInput {
             source: None,
             priority: Priority::Normal,
             sensitivity: Sensitivity::Public,
+            ..Default::default()
         },
     }
 }
