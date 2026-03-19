@@ -13,6 +13,7 @@ fn make_input(content: &str, tags: Vec<&str>) -> RawInput {
             source: None,
             priority: Priority::Normal,
             sensitivity: Sensitivity::Public,
+            ..Default::default()
         },
     }
 }
@@ -472,4 +473,625 @@ fn test_conflict_not_found() {
 
     let addr = UorAddress::from_content("nonexistent");
     assert!(proc.record_conflict(&addr, 0.5).is_none());
+}
+
+// --- Co-capture linking tests (v5.2) ---
+
+#[tokio::test]
+async fn test_encode_creates_session_edges() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("fact one", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("fact two", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("fact three", vec![]), 1002).await.unwrap();
+
+    assert!(proc.stats().l2_edges > 0);
+}
+
+#[tokio::test]
+async fn test_encode_cross_reference_pins_peers() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let r1 = proc.encode(&make_input("first memory", vec![]), 1000).await.unwrap();
+    let addr1 = r1.unit.address.clone();
+    assert_eq!(r1.unit.saturation, 0.0);
+
+    // Second encode triggers CrossReference pin on first
+    proc.encode(&make_input("second memory", vec![]), 1001).await.unwrap();
+
+    let qr = proc.query(&make_query("first memory"), 1001).await.unwrap();
+    assert!(qr.recall.memories[0].unit.saturation > 0.0);
+    let _ = addr1; // used for clarity
+}
+
+#[tokio::test]
+async fn test_clear_session_resets() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("before clear", vec![]), 1000).await.unwrap();
+    let edges_before = proc.stats().l2_edges;
+
+    proc.clear_session();
+
+    proc.encode(&make_input("after clear", vec![]), 2000).await.unwrap();
+    // No new edges — session was cleared, no peers to link
+    assert_eq!(proc.stats().l2_edges, edges_before);
+}
+
+// --- Tier promotion tests (v5.2) ---
+
+#[tokio::test]
+async fn test_promotion_l2_to_l3_on_crystallization() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("promote me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+    assert_eq!(result.decision.tier, Tier::L2);
+    assert_eq!(proc.stats().l2_nodes, 1);
+    assert_eq!(proc.stats().l3_size, 0);
+
+    // Boost until promotion triggers (σ≥0.95)
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // Memory should have promoted to L3
+    assert_eq!(proc.stats().l2_nodes, 0);
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[tokio::test]
+async fn test_promoted_memory_queryable_by_address() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("will promote", vec![]), 1000).await.unwrap();
+
+    // Promote via repeated access
+    let addr = UorAddress::from_content("will promote");
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // O(1) L3 exact match should work now
+    let qr = proc.query(&make_query("will promote"), 2000).await.unwrap();
+    assert_eq!(qr.recall.memories.len(), 1);
+    assert_eq!(qr.recall.metrics.tiers_queried, vec![Tier::L3]);
+}
+
+#[tokio::test]
+async fn test_promotion_removes_from_l2() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    proc.encode(&make_input("stays", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("promotes", vec![]), 1001).await.unwrap();
+    assert_eq!(proc.stats().l2_nodes, 2);
+
+    let addr = UorAddress::from_content("promotes");
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert_eq!(proc.stats().l2_nodes, 1); // Only "stays" remains
+}
+
+#[tokio::test]
+async fn test_no_promotion_below_threshold() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc.encode(&make_input("stay in l2", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    // Access events have low weight (0.01) — won't reach 0.95
+    for _ in 0..10 {
+        proc.record_access(&addr, PinningEvent::Access);
+    }
+
+    assert_eq!(proc.stats().l2_nodes, 1); // Still in L2
+    assert_eq!(proc.stats().l3_size, 0);
+}
+
+// --- SLO tests (v5.4) ---
+
+use crate::processor::slo::{self, *};
+
+#[test]
+fn test_slo_clean_window_no_violations() {
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
+    for _ in 0..10 {
+        tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 0);
+    assert!((report.budget_remaining - 1.0).abs() < 1e-6);
+    assert!(!report.circuit_open);
+}
+
+#[test]
+fn test_slo_latency_violation_detected() {
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 1);
+    assert!(matches!(report.violations[0], SloViolation::LatencyExceeded { .. }));
+}
+
+#[test]
+fn test_slo_l3_latency_violation_detected() {
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
+    tracker.record(SloSample { latency_ms: 5, was_l3_direct: true, chain_valid: true });
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 1);
+    assert!(matches!(report.violations[0], SloViolation::L3LatencyExceeded { .. }));
+}
+
+#[test]
+fn test_slo_chain_integrity_violation() {
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
+    tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: false });
+    let report = tracker.evaluate();
+    assert!(report.violations.iter().any(|v| matches!(v, SloViolation::ChainIntegrityFailed)));
+}
+
+#[test]
+fn test_slo_budget_exhausted_opens_circuit() {
+    let thresholds = SloThresholds { max_violation_rate: 0.1, window_size: 10, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
+    // 2 violations out of 10 = 20% > 10% budget
+    for i in 0..10 {
+        let latency = if i < 2 { 100 } else { 1 };
+        tracker.record(SloSample { latency_ms: latency, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert!(report.circuit_open);
+    assert!((report.budget_remaining - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_slo_rolling_window_drops_oldest() {
+    let thresholds = SloThresholds { window_size: 5, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
+    // Add 1 violation then 5 clean samples — violation should be evicted
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    for _ in 0..5 {
+        tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 0);
+    assert_eq!(report.total_samples, 5);
+}
+
+#[test]
+fn test_slo_reset_circuit_clears_state() {
+    let thresholds = SloThresholds { max_violation_rate: 0.01, window_size: 5, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    assert!(tracker.evaluate().circuit_open || tracker.evaluate().budget_remaining < 1.0);
+    tracker.reset_circuit();
+    let report = tracker.evaluate();
+    assert!(!report.circuit_open);
+    assert_eq!(report.total_samples, 0);
+}
+
+#[tokio::test]
+async fn test_processor_query_records_slo_sample() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("slo test", vec![]), 1000).await.unwrap();
+    proc.query(&make_query("slo test"), 1000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.total_samples > 0);
+}
+
+#[tokio::test]
+async fn test_processor_slo_no_violations_on_normal_queries() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("normal", vec![]), 1000).await.unwrap();
+    proc.query(&make_query("normal"), 1000).await.unwrap();
+    let report = proc.slo_report();
+    assert_eq!(report.violation_count, 0);
+    assert!(!report.circuit_open);
+}
+
+// --- Cognitive profile tests (v5.5) ---
+
+#[test]
+fn test_profile_empty_system() {
+    let engine = MockEngine::new(32);
+    let proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let p = proc.profile(1000);
+    assert_eq!(p.total_memories, 0);
+    assert!((p.avg_saturation - 0.0).abs() < 1e-6);
+    assert_eq!(p.crystallized_count, 0);
+}
+
+#[tokio::test]
+async fn test_profile_counts_tiers() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("normal data", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("secret data", vec!["sensitive"]), 1000).await.unwrap();
+    let p = proc.profile(1000);
+    assert!(p.l2_count > 0 || p.l1_count > 0);
+    assert!(p.l3_count > 0);
+    assert_eq!(p.total_memories, p.l1_count + p.l2_count + p.l3_count);
+}
+
+#[tokio::test]
+async fn test_profile_avg_saturation() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("boost me", vec![]), 1000).await.unwrap();
+    proc.record_access(&result.unit.address, PinningEvent::CryptoVerification);
+    let p = proc.profile(1000);
+    assert!(p.avg_saturation > 0.0);
+}
+
+#[tokio::test]
+async fn test_profile_crystallized_count() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("crystallize me", vec![]), 1000).await.unwrap();
+    for _ in 0..25 {
+        proc.record_access(&result.unit.address, PinningEvent::CryptoVerification);
+    }
+    let p = proc.profile(1000);
+    assert!(p.crystallized_count > 0);
+}
+
+#[tokio::test]
+async fn test_profile_top_tags() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("tagged1", vec!["science"]), 1000).await.unwrap();
+    proc.encode(&make_input("tagged2", vec!["science"]), 1001).await.unwrap();
+    proc.encode(&make_input("tagged3", vec!["art"]), 1002).await.unwrap();
+    let p = proc.profile(1003);
+    assert!(!p.top_tags.is_empty());
+    assert_eq!(p.top_tags[0].0, "science");
+    assert_eq!(p.top_tags[0].1, 2);
+}
+
+#[test]
+fn test_profile_to_summary_readable() {
+    let p = crate::processor::profile::CognitiveProfile {
+        total_memories: 5,
+        l1_count: 1,
+        l2_count: 3,
+        l3_count: 1,
+        edge_count: 4,
+        avg_saturation: 0.42,
+        crystallized_count: 1,
+        top_tags: vec![("test".to_string(), 3)],
+    };
+    let summary = p.to_summary();
+    assert!(summary.contains("Memories: 5"));
+    assert!(summary.contains("Crystallized: 1"));
+    assert!(summary.contains("42.0%"));
+}
+
+// --- File ingestion tests (v5.6) ---
+
+use crate::processor::ingest::{chunk_text, ChunkConfig};
+
+#[test]
+fn test_chunk_text_splits_at_paragraphs() {
+    let text = "Alpha paragraph.\n\nBeta paragraph.\n\nGamma paragraph.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 20, min_chunk_chars: 5 });
+    assert_eq!(chunks.len(), 3);
+}
+
+#[test]
+fn test_chunk_text_merges_small_paragraphs() {
+    let text = "Hi there.\n\nBye now.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 100, min_chunk_chars: 5 });
+    assert_eq!(chunks.len(), 1);
+    assert!(chunks[0].contains("Hi there."));
+    assert!(chunks[0].contains("Bye now."));
+}
+
+#[test]
+fn test_chunk_text_skips_tiny_chunks() {
+    let text = "Ok";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 100, min_chunk_chars: 10 });
+    assert!(chunks.is_empty());
+}
+
+#[test]
+fn test_chunk_text_empty_input() {
+    let chunks = chunk_text("", &ChunkConfig::default());
+    assert!(chunks.is_empty());
+}
+
+#[test]
+fn test_chunk_text_respects_max() {
+    let text = "A long paragraph that exceeds the limit.\n\nAnother one here.";
+    let chunks = chunk_text(text, &ChunkConfig { max_chunk_chars: 30, min_chunk_chars: 5 });
+    assert!(chunks.len() >= 2);
+}
+
+#[tokio::test]
+async fn test_ingest_text_creates_memories() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let text = "First paragraph about Rust.\n\nSecond paragraph about memory.\n\nThird about graphs.";
+    let result = crate::processor::ingest::ingest_text(
+        &mut proc, text, "test.md", vec![], &ChunkConfig { max_chunk_chars: 40, min_chunk_chars: 10 }, 1000,
+    ).await.unwrap();
+    assert!(result.chunks >= 2);
+    assert_eq!(result.addresses.len(), result.chunks);
+}
+
+#[tokio::test]
+async fn test_ingest_text_preserves_source() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = crate::processor::ingest::ingest_text(
+        &mut proc, "Content here is long enough to be a chunk.", "notes.md", vec![], &ChunkConfig::default(), 1000,
+    ).await.unwrap();
+    assert_eq!(result.source, "notes.md");
+}
+
+#[tokio::test]
+async fn test_ingest_file_nonexistent_returns_error() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.ingest_file(std::path::Path::new("/nonexistent/file.txt"), vec![], 1000).await;
+    assert!(result.is_err());
+}
+
+// --- Zero-trust crystallization tests (v5.7) ---
+
+use crate::processor::trust::CrystallizationPolicy;
+
+#[tokio::test]
+async fn test_require_approval_blocks_auto_promotion() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("guard me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // σ > 0.95 but memory should NOT be promoted (guarded)
+    assert!(proc.stats().l2_nodes > 0 || proc.stats().l1_size > 0);
+    assert_eq!(proc.stats().l3_size, 0);
+}
+
+#[tokio::test]
+async fn test_approve_crystallization_promotes() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("approve me", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert!(proc.approve_crystallization(&addr));
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[tokio::test]
+async fn test_approve_crystallization_rejects_low_sigma() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::RequireApproval;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("too young", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    proc.record_access(&addr, PinningEvent::Access);
+    assert!(!proc.approve_crystallization(&addr));
+}
+
+#[tokio::test]
+async fn test_auto_policy_still_works() {
+    let mut config = ProcessorConfig::default();
+    config.crystallization = CrystallizationPolicy::Auto;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    let result = proc.encode(&make_input("auto promote", vec![]), 1000).await.unwrap();
+    let addr = result.unit.address.clone();
+
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    assert!(proc.stats().l3_size > 0);
+}
+
+#[test]
+fn test_default_policy_is_auto_for_compat() {
+    let config = ProcessorConfig::default();
+    assert_eq!(config.crystallization, CrystallizationPolicy::Auto);
+}
+
+// --- Source provenance tests (v5.7) ---
+
+use crate::memory::types::TrustLevel;
+
+#[test]
+fn test_unverified_starts_at_zero() {
+    assert!((TrustLevel::Unverified.initial_saturation() - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_user_reviewed_starts_higher() {
+    assert!((TrustLevel::UserReviewed.initial_saturation() - 0.1).abs() < 1e-6);
+}
+
+#[test]
+fn test_verified_starts_highest() {
+    assert!((TrustLevel::Verified.initial_saturation() - 0.3).abs() < 1e-6);
+}
+
+#[tokio::test]
+async fn test_encode_respects_trust_level() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let input = RawInput {
+        content: "verified fact".to_string(),
+        content_type: ContentType::Text,
+        metadata: InputMetadata {
+            trust: TrustLevel::UserReviewed,
+            ..Default::default()
+        },
+    };
+    let result = proc.encode(&input, 1000).await.unwrap();
+    assert!((result.unit.saturation - 0.1).abs() < 1e-6);
+}
+
+// --- Memory deletion & traversal tests (v5.8) ---
+
+#[tokio::test]
+async fn test_forget_removes_from_l2() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc.encode(&make_input("forget me", vec![]), 1000).await.unwrap();
+    assert!(proc.stats().l2_nodes > 0);
+    assert!(proc.forget(&result.unit.address));
+    assert_eq!(proc.stats().l2_nodes, 0);
+}
+
+#[tokio::test]
+async fn test_forget_removes_from_l3() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("secret delete", vec!["sensitive"]), 1000).await.unwrap();
+    let addr = UorAddress::from_content("secret delete");
+    assert!(proc.stats().l3_size > 0);
+    assert!(proc.forget(&addr));
+    assert_eq!(proc.stats().l3_size, 0);
+}
+
+#[test]
+fn test_forget_not_found() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert!(!proc.forget(&UorAddress::from_content("nonexistent")));
+}
+
+#[tokio::test]
+async fn test_forget_cleans_edges() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("linked A", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("linked B", vec![]), 1001).await.unwrap();
+    assert!(proc.stats().l2_edges > 0);
+    proc.forget(&r1.unit.address);
+    // Edges involving the deleted node should be cleaned
+    assert_eq!(proc.association_count(&r1.unit.address), 0);
+}
+
+#[tokio::test]
+async fn test_related_returns_neighbors() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("node A", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("node B", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("node C", vec![]), 1002).await.unwrap();
+    let neighbors = proc.related(&r1.unit.address);
+    assert!(neighbors.len() >= 1);
+}
+
+#[tokio::test]
+async fn test_related_empty_for_isolated() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("alone", vec![]), 1000).await.unwrap();
+    proc.clear_session();
+    proc.encode(&make_input("separate", vec![]), 2000).await.unwrap();
+    assert!(proc.related(&r1.unit.address).is_empty());
+}
+
+#[tokio::test]
+async fn test_association_count() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let r1 = proc.encode(&make_input("hub", vec![]), 1000).await.unwrap();
+    proc.encode(&make_input("spoke1", vec![]), 1001).await.unwrap();
+    proc.encode(&make_input("spoke2", vec![]), 1002).await.unwrap();
+    assert!(proc.association_count(&r1.unit.address) >= 2);
+}
+
+// --- Pressure-aware decay tests (v5.9) ---
+
+#[test]
+fn test_pressure_zero_when_empty() {
+    let p = slo::calculate_pressure(0, 100, 0, 10_000);
+    assert!((p - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_pressure_increases_with_utilization() {
+    let p = slo::calculate_pressure(0, 100, 5000, 10_000);
+    assert!((p - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn test_pressure_capped_at_one() {
+    let p = slo::calculate_pressure(200, 100, 20_000, 10_000);
+    assert!((p - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_adjusted_half_life_decreases_under_pressure() {
+    let base = 3_600_000_i64;
+    let adj = slo::pressure_adjusted_half_life(base, 0.9, 2.0);
+    assert!(adj < base);
+    assert!(adj > 0);
+}
+
+#[test]
+fn test_adjusted_half_life_unchanged_at_zero_pressure() {
+    let base = 3_600_000_i64;
+    let adj = slo::pressure_adjusted_half_life(base, 0.0, 2.0);
+    assert_eq!(adj, base);
+}
+
+#[tokio::test]
+async fn test_slo_report_includes_pressure() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    for i in 0..5 {
+        proc.encode(&make_input(&format!("pressure data {i}"), vec![]), 1000 + i).await.unwrap();
+    }
+    proc.query(&make_query("pressure"), 2000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.pressure >= 0.0);
+    assert!(report.adjusted_half_life_ms > 0);
+}
+
+#[tokio::test]
+async fn test_pressure_adjusts_half_life_in_report() {
+    let mut config = ProcessorConfig::default();
+    config.pressure.l2_capacity = 10; // small capacity to trigger pressure
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+    for i in 0..8 {
+        proc.encode(&make_input(&format!("fill {i}"), vec![]), 1000 + i).await.unwrap();
+    }
+    proc.query(&make_query("fill"), 2000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.pressure > 0.5);
+    assert!(report.adjusted_half_life_ms < 3_600_000);
 }

@@ -1,6 +1,6 @@
 {
   "name": "evolve-ai",
-  "version": "1.0.0",
+  "version": "5.2.0",
   "description": "Autopoietic Memory System - A learning computer that evolves its own neural network-like memory structures",
   "main": "dist/core/processor/index.js",
   "types": "dist/core/processor/index.d.ts",

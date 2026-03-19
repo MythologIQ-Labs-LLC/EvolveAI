@@ -98,6 +98,28 @@ impl L2Graph {
         &self.edges
     }
 
+    /// Link a new node to all session peers in this graph.
+    /// Edge weight: 1.0 / (1.0 + gap_ms / 1000.0) — closer in time = stronger.
+    pub fn link_to_session(
+        &mut self,
+        new_addr: &UorAddress,
+        session: &[(UorAddress, i64)],
+        now: i64,
+    ) {
+        for (peer_addr, peer_time) in session {
+            if !self.nodes.contains_key(peer_addr) {
+                continue;
+            }
+            let gap_ms = (now - peer_time).unsigned_abs() as f32;
+            let weight = 1.0 / (1.0 + gap_ms / 1000.0);
+            if weight < 0.05 {
+                continue; // Skip distant links — bounds O(K²) edge growth
+            }
+            self.add_edge(new_addr.clone(), peer_addr.clone(), weight, now);
+            self.add_edge(peer_addr.clone(), new_addr.clone(), weight, now);
+        }
+    }
+
     /// Reconstruct from parts.
     pub fn from_parts(nodes: Vec<MemoryUnit>, edges: HashMap<UorAddress, Vec<Edge>>) -> Self {
         let node_map = nodes.into_iter().map(|u| (u.address.clone(), u)).collect();

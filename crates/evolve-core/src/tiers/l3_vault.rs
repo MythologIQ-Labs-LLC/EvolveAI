@@ -19,7 +19,8 @@ impl L3Vault {
     }
 
     /// Store a memory unit and record its hash on the ledger.
-    pub fn store(&mut self, unit: MemoryUnit) {
+    /// pub(crate): only internal code can bypass the crystallization policy.
+    pub(crate) fn store(&mut self, unit: MemoryUnit) {
         let data = serde_json::to_vec(&unit).expect("MemoryUnit serialization cannot fail");
         let data_hash = hash::content_hash(&data);
         self.ledger.append(data_hash);
@@ -34,6 +35,11 @@ impl L3Vault {
     /// Retrieve a memory unit by address.
     pub fn get(&self, addr: &UorAddress) -> Option<&MemoryUnit> {
         self.entries.get(addr)
+    }
+
+    /// Remove an entry. Returns the unit if found.
+    pub(crate) fn remove(&mut self, addr: &UorAddress) -> Option<MemoryUnit> {
+        self.entries.remove(addr)
     }
 
     /// Get a mutable reference to an entry by address.
