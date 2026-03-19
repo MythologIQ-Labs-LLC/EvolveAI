@@ -283,7 +283,7 @@ Create a simplified API layer over the full NeuralNetProcessor for developers wh
 | BL-006 | L3 Approval Workflows | 🟡 High | OPEN | — |
 | BL-007 | Rego Policy Export | 🟡 High | OPEN | BL-001 |
 | BL-008 | Shapley Fault Attribution | 🟡 High | OPEN | BL-005 |
-| BL-009 | SLO / Error Budgets | 🟡 High | OPEN | — |
+| BL-009 | SLO / Error Budgets | 🟡 High | COMPLETE (v5.4) | — |
 | BL-010 | Cognitive Profile | 🟢 Standard | OPEN | — |
 | BL-011 | File Ingestion | 🟢 Standard | OPEN | — |
 | BL-012 | Co-Capture Linking | 🟢 Standard | COMPLETE (v5.2) | — |

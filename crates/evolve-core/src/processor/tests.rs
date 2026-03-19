@@ -595,3 +595,106 @@ async fn test_no_promotion_below_threshold() {
     assert_eq!(proc.stats().l2_nodes, 1); // Still in L2
     assert_eq!(proc.stats().l3_size, 0);
 }
+
+// --- SLO tests (v5.4) ---
+
+use crate::processor::slo::*;
+
+#[test]
+fn test_slo_clean_window_no_violations() {
+    let mut tracker = SloTracker::new(SloThresholds::default());
+    for _ in 0..10 {
+        tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 0);
+    assert!((report.budget_remaining - 1.0).abs() < 1e-6);
+    assert!(!report.circuit_open);
+}
+
+#[test]
+fn test_slo_latency_violation_detected() {
+    let mut tracker = SloTracker::new(SloThresholds::default());
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 1);
+    assert!(matches!(report.violations[0], SloViolation::LatencyExceeded { .. }));
+}
+
+#[test]
+fn test_slo_l3_latency_violation_detected() {
+    let mut tracker = SloTracker::new(SloThresholds::default());
+    tracker.record(SloSample { latency_ms: 5, was_l3_direct: true, chain_valid: true });
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 1);
+    assert!(matches!(report.violations[0], SloViolation::L3LatencyExceeded { .. }));
+}
+
+#[test]
+fn test_slo_chain_integrity_violation() {
+    let mut tracker = SloTracker::new(SloThresholds::default());
+    tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: false });
+    let report = tracker.evaluate();
+    assert!(report.violations.iter().any(|v| matches!(v, SloViolation::ChainIntegrityFailed)));
+}
+
+#[test]
+fn test_slo_budget_exhausted_opens_circuit() {
+    let thresholds = SloThresholds { max_violation_rate: 0.1, window_size: 10, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds);
+    // 2 violations out of 10 = 20% > 10% budget
+    for i in 0..10 {
+        let latency = if i < 2 { 100 } else { 1 };
+        tracker.record(SloSample { latency_ms: latency, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert!(report.circuit_open);
+    assert!((report.budget_remaining - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_slo_rolling_window_drops_oldest() {
+    let thresholds = SloThresholds { window_size: 5, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds);
+    // Add 1 violation then 5 clean samples — violation should be evicted
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    for _ in 0..5 {
+        tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: true });
+    }
+    let report = tracker.evaluate();
+    assert_eq!(report.violation_count, 0);
+    assert_eq!(report.total_samples, 5);
+}
+
+#[test]
+fn test_slo_reset_circuit_clears_state() {
+    let thresholds = SloThresholds { max_violation_rate: 0.01, window_size: 5, ..Default::default() };
+    let mut tracker = SloTracker::new(thresholds);
+    tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
+    assert!(tracker.evaluate().circuit_open || tracker.evaluate().budget_remaining < 1.0);
+    tracker.reset_circuit();
+    let report = tracker.evaluate();
+    assert!(!report.circuit_open);
+    assert_eq!(report.total_samples, 0);
+}
+
+#[tokio::test]
+async fn test_processor_query_records_slo_sample() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("slo test", vec![]), 1000).await.unwrap();
+    proc.query(&make_query("slo test"), 1000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.total_samples > 0);
+}
+
+#[tokio::test]
+async fn test_processor_slo_no_violations_on_normal_queries() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("normal", vec![]), 1000).await.unwrap();
+    proc.query(&make_query("normal"), 1000).await.unwrap();
+    let report = proc.slo_report();
+    assert_eq!(report.violation_count, 0);
+    assert!(!report.circuit_open);
+}

@@ -1,56 +1,49 @@
 # System State
 
-**Generated**: 2026-03-19T02:15:00Z
+**Generated**: 2026-03-19T03:00:00Z
 **Phase**: SUBSTANTIATE
 **Status**: SEALED
-**Version**: v5.3.0
+**Version**: v5.4.0
 
 ---
 
-## evolve-core: 42 files, 9 modules, 150 tests
+## evolve-core: 43 files, 9 modules, 160 tests
 
 ```
 crates/evolve-core/src/
 ├── lib.rs                        # 8 modules
-├── simple.rs                     # v5.3: SimpleMemory ergonomic facade (BL-014)
+├── simple.rs                     # SimpleMemory ergonomic facade (216 lines)
 ├── representation/               # 8 files, 16 tests
 ├── memory/                       # 6 files, 36 tests
 ├── chain/                        # 5 files, 12 tests
 ├── tiers/                        # 6 files, 22 tests
 ├── shadow/                       # 5 files, 11 tests
 ├── lifecycle/                    # 4 files, 12 tests
-└── processor/                    # 6 files, 32 tests
-    ├── facade.rs                 # Core processor (212 lines)
+└── processor/                    # 7 files, 41 tests
+    ├── facade.rs                 # Core processor (238 lines)
     ├── query.rs                  # Query extraction (102 lines)
-    ├── persist.rs                # Persistence extraction (69 lines)
-    └── types.rs                  # Shared types + config (99 lines)
+    ├── persist.rs                # Persistence (69 lines)
+    ├── slo.rs                    # v5.4: SLO tracker + circuit breaker (135 lines)
+    └── types.rs                  # Shared types + config (102 lines)
 ```
 
-## SimpleMemory API (v5.3)
+## v5.4 Changes: SLO Evaluation & Circuit Breaker (BL-009)
 
-```rust
-let mut mem = SimpleMemory::new();
-let addr = mem.add("the sky is blue").await?;
-let results = mem.search("sky color", 5).await?;
-mem.feedback(&addr, PinningEvent::CryptoVerification);
-```
+| SLO | Default Target | Violation Type |
+|-----|---------------|---------------|
+| Query latency (L1/L2) | < 50ms | LatencyExceeded |
+| L3 lookup latency | < 1ms | L3LatencyExceeded |
+| Chain integrity | 100% | ChainIntegrityFailed |
+| Error budget | 1% max violations | Circuit opens |
 
-| Method | Delegates To |
-|--------|-------------|
-| `add(content)` | processor.encode() |
-| `add_tagged(content, tags)` | processor.encode() |
-| `search(query, top_k)` | processor.query() |
-| `feedback(addr, event)` | processor.record_access() |
-| `dispute(addr, severity)` | processor.record_conflict() |
-| `end_session()` | processor.clear_session() |
-| `into_processor()` | Escape hatch to full API |
+Rolling window (100 samples). Manual-reset circuit breaker. Mutex for thread safety.
 
 ## Section 4 Compliance
 
 | Check | Limit | Actual | Status |
 |-------|-------|--------|--------|
-| Max production file | 250 | 212 (facade.rs) | PASS |
-| Max function lines | 40 | 15 (add_tagged) | PASS |
+| Max production file | 250 | 238 (facade.rs) | PASS |
+| Max function lines | 40 | 25 (evaluate) | PASS |
 | Max nesting depth | 3 | 2 | PASS |
 | Console artifacts | 0 | 0 | PASS |
 

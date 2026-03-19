@@ -109,6 +109,11 @@ impl SimpleMemory {
         self.processor.clear_session();
     }
 
+    /// Get the current SLO report.
+    pub fn slo_report(&self) -> crate::processor::slo::SloReport {
+        self.processor.slo_report()
+    }
+
     /// Access the full processor for power-user operations.
     pub fn processor(&self) -> &MemoryProcessor<MockEngine> {
         &self.processor
@@ -189,6 +194,16 @@ mod tests {
         let mem = SimpleMemory::new();
         let results = mem.search("anything", 10).await.unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_simple_slo_report() {
+        let mut mem = SimpleMemory::new();
+        mem.add("slo check").await.unwrap();
+        mem.search("slo check", 5).await.unwrap();
+        let report = mem.slo_report();
+        assert!(report.total_samples > 0);
+        assert!(!report.circuit_open);
     }
 
     #[tokio::test]

@@ -2,6 +2,7 @@ pub mod types;
 pub mod facade;
 pub mod persist;
 pub mod query;
+pub mod slo;
 
 pub use types::*;
 pub use facade::*;

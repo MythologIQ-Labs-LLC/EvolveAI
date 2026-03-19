@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
 use crate::memory::decay;
@@ -5,6 +6,7 @@ use crate::memory::encoder;
 use crate::memory::types::*;
 use crate::processor::persist;
 use crate::processor::query as query_mod;
+use crate::processor::slo::{SloReport, SloSample, SloTracker};
 use crate::processor::types::{
     EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
     QueryResult, Snapshot,
@@ -27,6 +29,7 @@ pub struct MemoryProcessor<E: RepresentationEngine> {
     shadow: ShadowGenome,
     lifecycle: Orchestrator,
     session_log: Vec<(UorAddress, i64)>,
+    slo_tracker: Mutex<SloTracker>,
 }
 
 impl<E: RepresentationEngine> MemoryProcessor<E> {
@@ -43,6 +46,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             shadow: ShadowGenome::default(),
             lifecycle,
             engine,
+            slo_tracker: Mutex::new(SloTracker::new(config.slo.clone())),
             config,
             session_log: Vec::new(),
         }
@@ -94,11 +98,12 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         let allows_l3 = matches!(query.constraints.require_tier, None | Some(Tier::L3));
         if allows_l3 {
             if let Some(result) = query_mod::try_l3_exact_match(&self.l3, &query.content, start) {
+                self.record_slo_sample(&result);
                 return Ok(result);
             }
         }
 
-        query_mod::vector_scan(
+        let result = query_mod::vector_scan(
             &self.engine,
             &self.config.decoder,
             &self.l1,
@@ -108,7 +113,28 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             now,
             start,
         )
-        .await
+        .await?;
+
+        self.record_slo_sample(&result);
+        Ok(result)
+    }
+
+    pub fn slo_report(&self) -> SloReport {
+        self.slo_tracker.lock().unwrap().evaluate()
+    }
+
+    pub fn reset_slo(&self) {
+        self.slo_tracker.lock().unwrap().reset_circuit();
+    }
+
+    fn record_slo_sample(&self, result: &QueryResult) {
+        let was_l3_direct = result.recall.metrics.tiers_queried == vec![Tier::L3]
+            && result.recall.metrics.candidates_evaluated == 1;
+        self.slo_tracker.lock().unwrap().record(SloSample {
+            latency_ms: result.latency_ms,
+            was_l3_direct,
+            chain_valid: self.l3.verify_integrity(),
+        });
     }
 
     pub fn stats(&self) -> ProcessorStats {
