@@ -599,11 +599,11 @@ async fn test_no_promotion_below_threshold() {
 
 // --- SLO tests (v5.4) ---
 
-use crate::processor::slo::*;
+use crate::processor::slo::{self, *};
 
 #[test]
 fn test_slo_clean_window_no_violations() {
-    let mut tracker = SloTracker::new(SloThresholds::default());
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
     for _ in 0..10 {
         tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: true });
     }
@@ -615,7 +615,7 @@ fn test_slo_clean_window_no_violations() {
 
 #[test]
 fn test_slo_latency_violation_detected() {
-    let mut tracker = SloTracker::new(SloThresholds::default());
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
     tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
     let report = tracker.evaluate();
     assert_eq!(report.violation_count, 1);
@@ -624,7 +624,7 @@ fn test_slo_latency_violation_detected() {
 
 #[test]
 fn test_slo_l3_latency_violation_detected() {
-    let mut tracker = SloTracker::new(SloThresholds::default());
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
     tracker.record(SloSample { latency_ms: 5, was_l3_direct: true, chain_valid: true });
     let report = tracker.evaluate();
     assert_eq!(report.violation_count, 1);
@@ -633,7 +633,7 @@ fn test_slo_l3_latency_violation_detected() {
 
 #[test]
 fn test_slo_chain_integrity_violation() {
-    let mut tracker = SloTracker::new(SloThresholds::default());
+    let mut tracker = SloTracker::new(SloThresholds::default(), PressureConfig::default(), 3_600_000);
     tracker.record(SloSample { latency_ms: 1, was_l3_direct: false, chain_valid: false });
     let report = tracker.evaluate();
     assert!(report.violations.iter().any(|v| matches!(v, SloViolation::ChainIntegrityFailed)));
@@ -642,7 +642,7 @@ fn test_slo_chain_integrity_violation() {
 #[test]
 fn test_slo_budget_exhausted_opens_circuit() {
     let thresholds = SloThresholds { max_violation_rate: 0.1, window_size: 10, ..Default::default() };
-    let mut tracker = SloTracker::new(thresholds);
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
     // 2 violations out of 10 = 20% > 10% budget
     for i in 0..10 {
         let latency = if i < 2 { 100 } else { 1 };
@@ -656,7 +656,7 @@ fn test_slo_budget_exhausted_opens_circuit() {
 #[test]
 fn test_slo_rolling_window_drops_oldest() {
     let thresholds = SloThresholds { window_size: 5, ..Default::default() };
-    let mut tracker = SloTracker::new(thresholds);
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
     // Add 1 violation then 5 clean samples — violation should be evicted
     tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
     for _ in 0..5 {
@@ -670,7 +670,7 @@ fn test_slo_rolling_window_drops_oldest() {
 #[test]
 fn test_slo_reset_circuit_clears_state() {
     let thresholds = SloThresholds { max_violation_rate: 0.01, window_size: 5, ..Default::default() };
-    let mut tracker = SloTracker::new(thresholds);
+    let mut tracker = SloTracker::new(thresholds, PressureConfig::default(), 3_600_000);
     tracker.record(SloSample { latency_ms: 100, was_l3_direct: false, chain_valid: true });
     assert!(tracker.evaluate().circuit_open || tracker.evaluate().budget_remaining < 1.0);
     tracker.reset_circuit();
@@ -1031,4 +1031,67 @@ async fn test_association_count() {
     proc.encode(&make_input("spoke1", vec![]), 1001).await.unwrap();
     proc.encode(&make_input("spoke2", vec![]), 1002).await.unwrap();
     assert!(proc.association_count(&r1.unit.address) >= 2);
+}
+
+// --- Pressure-aware decay tests (v5.9) ---
+
+#[test]
+fn test_pressure_zero_when_empty() {
+    let p = slo::calculate_pressure(0, 100, 0, 10_000);
+    assert!((p - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_pressure_increases_with_utilization() {
+    let p = slo::calculate_pressure(0, 100, 5000, 10_000);
+    assert!((p - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn test_pressure_capped_at_one() {
+    let p = slo::calculate_pressure(200, 100, 20_000, 10_000);
+    assert!((p - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_adjusted_half_life_decreases_under_pressure() {
+    let base = 3_600_000_i64;
+    let adj = slo::pressure_adjusted_half_life(base, 0.9, 2.0);
+    assert!(adj < base);
+    assert!(adj > 0);
+}
+
+#[test]
+fn test_adjusted_half_life_unchanged_at_zero_pressure() {
+    let base = 3_600_000_i64;
+    let adj = slo::pressure_adjusted_half_life(base, 0.0, 2.0);
+    assert_eq!(adj, base);
+}
+
+#[tokio::test]
+async fn test_slo_report_includes_pressure() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    for i in 0..5 {
+        proc.encode(&make_input(&format!("pressure data {i}"), vec![]), 1000 + i).await.unwrap();
+    }
+    proc.query(&make_query("pressure"), 2000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.pressure >= 0.0);
+    assert!(report.adjusted_half_life_ms > 0);
+}
+
+#[tokio::test]
+async fn test_pressure_adjusts_half_life_in_report() {
+    let mut config = ProcessorConfig::default();
+    config.pressure.l2_capacity = 10; // small capacity to trigger pressure
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+    for i in 0..8 {
+        proc.encode(&make_input(&format!("fill {i}"), vec![]), 1000 + i).await.unwrap();
+    }
+    proc.query(&make_query("fill"), 2000).await.unwrap();
+    let report = proc.slo_report();
+    assert!(report.pressure > 0.5);
+    assert!(report.adjusted_half_life_ms < 3_600_000);
 }

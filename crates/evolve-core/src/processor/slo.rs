@@ -37,6 +37,8 @@ pub struct SloReport {
     pub violation_rate: f32,
     pub budget_remaining: f32,
     pub circuit_open: bool,
+    pub pressure: f32,
+    pub adjusted_half_life_ms: i64,
 }
 
 /// A specific SLO violation.
@@ -47,20 +49,57 @@ pub enum SloViolation {
     ChainIntegrityFailed,
 }
 
+/// Memory pressure configuration.
+#[derive(Clone, Debug)]
+pub struct PressureConfig {
+    pub l2_capacity: usize,
+    pub pressure_curve: f32,
+}
+
+impl Default for PressureConfig {
+    fn default() -> Self {
+        Self { l2_capacity: 10_000, pressure_curve: 2.0 }
+    }
+}
+
+/// Compute memory pressure from tier utilization. Returns 0.0–1.0.
+pub fn calculate_pressure(l1_size: usize, l1_max: usize, l2_size: usize, l2_cap: usize) -> f32 {
+    let l1_u = if l1_max > 0 { l1_size as f32 / l1_max as f32 } else { 0.0 };
+    let l2_u = if l2_cap > 0 { l2_size as f32 / l2_cap as f32 } else { 0.0 };
+    l1_u.max(l2_u).min(1.0)
+}
+
+/// Adjust half-life based on pressure. Higher pressure = faster decay.
+pub fn pressure_adjusted_half_life(base_ms: i64, pressure: f32, curve: f32) -> i64 {
+    let divisor = 1.0 + pressure.clamp(0.0, 1.0).powf(curve);
+    (base_ms as f32 / divisor).max(1.0) as i64
+}
+
 /// Rolling window SLO tracker.
 pub struct SloTracker {
     thresholds: SloThresholds,
+    pressure_config: PressureConfig,
     samples: Vec<SloSample>,
     circuit_open: bool,
+    current_pressure: f32,
+    base_half_life_ms: i64,
 }
 
 impl SloTracker {
-    pub fn new(thresholds: SloThresholds) -> Self {
+    pub fn new(thresholds: SloThresholds, pressure: PressureConfig, base_half_life_ms: i64) -> Self {
         Self {
             thresholds,
+            pressure_config: pressure,
             samples: Vec::new(),
             circuit_open: false,
+            current_pressure: 0.0,
+            base_half_life_ms,
         }
+    }
+
+    /// Update pressure from current tier sizes.
+    pub fn update_pressure(&mut self, l1_size: usize, l1_max: usize, l2_size: usize) {
+        self.current_pressure = calculate_pressure(l1_size, l1_max, l2_size, self.pressure_config.l2_capacity);
     }
 
     /// Record a query sample and return current SLO report.
@@ -95,6 +134,10 @@ impl SloTracker {
             if violation_count > 0 { 0.0 } else { 1.0 }
         };
 
+        let adj = pressure_adjusted_half_life(
+            self.base_half_life_ms, self.current_pressure, self.pressure_config.pressure_curve,
+        );
+
         SloReport {
             violations,
             total_samples: total,
@@ -102,6 +145,8 @@ impl SloTracker {
             violation_rate: rate,
             budget_remaining: budget,
             circuit_open: self.circuit_open,
+            pressure: self.current_pressure,
+            adjusted_half_life_ms: adj,
         }
     }
 

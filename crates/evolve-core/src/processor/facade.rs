@@ -48,7 +48,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             shadow: ShadowGenome::default(),
             lifecycle,
             engine,
-            slo_tracker: Mutex::new(SloTracker::new(config.slo.clone())),
+            slo_tracker: Mutex::new(SloTracker::new(config.slo.clone(), config.pressure.clone(), config.decoder.half_life_ms)),
             config,
             session_log: Vec::new(),
         }
@@ -62,7 +62,6 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
         self.lifecycle.phase()
     }
 
-    /// Encode raw input and store in the appropriate tier.
     pub async fn encode(
         &mut self,
         input: &RawInput,
@@ -136,7 +135,9 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     fn record_slo_sample(&self, result: &QueryResult) {
         let was_l3_direct = result.recall.metrics.tiers_queried == vec![Tier::L3]
             && result.recall.metrics.candidates_evaluated == 1;
-        self.slo_tracker.lock().unwrap().record(SloSample {
+        let mut tracker = self.slo_tracker.lock().unwrap();
+        tracker.update_pressure(self.l1.len(), self.config.l1_max_size, self.l2.node_count());
+        tracker.record(SloSample {
             latency_ms: result.latency_ms,
             was_l3_direct,
             chain_valid: self.l3.verify_integrity(),

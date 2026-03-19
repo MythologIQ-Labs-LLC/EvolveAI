@@ -2646,13 +2646,53 @@ SHA256 = 426872425520b3e450c1760a2cb118938ba42c4b26761ba70ca439f41fc05a79
 
 ---
 
+---
+
+### Entry #76: PLAN v5.9 + GATE TRIBUNAL
+
+**Timestamp**: 2026-03-19T06:15:00Z
+**Phase**: GATE
+**Author**: Judge
+**Risk Grade**: L1
+**Verdict**: PASS
+
+**Chain Hash**:
+```
+SHA256 = 5e647568e38d48b599ea77b122174e7e608f0029756eb3601620265f581f8ffb
+```
+
+**Decision**: v5.9 Pressure-Aware Decay APPROVED. Zero facade growth. Pure functions in slo.rs. Last UOR research gap.
+
+---
+
+---
+
+### Entry #77: IMPLEMENTATION + SEAL — v5.9.0
+
+**Timestamp**: 2026-03-19T06:30:00Z
+**Phase**: IMPLEMENT + SUBSTANTIATE
+**Author**: Specialist + Judge
+**Risk Grade**: L1
+
+**Changes**: PressureConfig, calculate_pressure, pressure_adjusted_half_life in slo.rs. Pressure + adjusted_half_life in SloReport. Auto-update in record_slo_sample.
+**Tests**: 201 pass (+7 new)
+
+**Chain Hash**:
+```
+SHA256 = 57fca8e8b57ce21a8704811046bbef413b61985a24553c63f082b0dfa275f446
+```
+
+**Decision**: v5.9 Pressure-Aware Decay COMPLETE. Last UOR research gap closed. The thermodynamic model is feature-complete: identity, decay, pinning, entropy, linking, promotion, crystallization guard, provenance, and pressure.
+
+---
+
 ## Chain Status: SEALED
 
 **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-**Final Hash**: `426872425520b3e450c1760a2cb118938ba42c4b26761ba70ca439f41fc05a79`
-**Blocks**: 75
-**Lifecycle**: RELEASED (v5.8.0)
-**Version**: v5.8.0
+**Final Hash**: `57fca8e8b57ce21a8704811046bbef413b61985a24553c63f082b0dfa275f446`
+**Blocks**: 77
+**Lifecycle**: RELEASED (v5.9.0)
+**Version**: v5.9.0
 
 ---
 

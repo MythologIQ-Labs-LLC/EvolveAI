@@ -2,7 +2,7 @@ use crate::chain::block::Block;
 use crate::memory::decoder::DecoderConfig;
 use crate::memory::encoder::EncoderConfig;
 use crate::memory::types::{MemoryUnit, RecallResult, Tier, UorAddress};
-use crate::processor::slo::SloThresholds;
+use crate::processor::slo::{PressureConfig, SloThresholds};
 use crate::processor::trust::CrystallizationPolicy;
 use crate::shadow::interceptor::InterceptorConfig;
 use crate::shadow::types::ShadowEntry;
@@ -65,6 +65,7 @@ pub struct ProcessorConfig {
     pub l1_ttl_ms: i64,
     pub l1_max_size: usize,
     pub slo: SloThresholds,
+    pub pressure: PressureConfig,
     pub crystallization: CrystallizationPolicy,
 }
 
@@ -78,6 +79,7 @@ impl Default for ProcessorConfig {
             l1_ttl_ms: 300_000,
             l1_max_size: 1000,
             slo: SloThresholds::default(),
+            pressure: PressureConfig::default(),
             crystallization: CrystallizationPolicy::Auto,
         }
     }
