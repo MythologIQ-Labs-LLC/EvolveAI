@@ -1,0 +1,3 @@
+[submodule "vendor/GG-CORE"]
+	path = vendor/GG-CORE
+	url = https://github.com/MythologIQ/GG-CORE.git
