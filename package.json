@@ -40,8 +40,8 @@
     "typescript": "^5.0.0",
     "vitest": "^1.0.0",
     "tsx": "^4.0.0",
-    "eslint": "^8.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0"
+    "eslint": "^10.5.0",
+    "@typescript-eslint/parser": "^8.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.0"
   }
 }
