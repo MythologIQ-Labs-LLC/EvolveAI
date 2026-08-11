@@ -81,9 +81,7 @@ pub async fn query_memory(
 }
 
 #[tauri::command]
-pub async fn get_stats(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<StatsResponse, String> {
+pub async fn get_stats(processor: State<'_, Mutex<AppProcessor>>) -> Result<StatsResponse, String> {
     let proc = processor.lock().await;
     let s = proc.stats();
     Ok(StatsResponse {
@@ -104,19 +102,24 @@ pub async fn check_safety(
     processor: State<'_, Mutex<AppProcessor>>,
 ) -> Result<SafetyResponse, String> {
     let mut proc = processor.lock().await;
-    let verdict = proc.check_safety(&intent).await.map_err(|e| e.to_string())?;
+    let verdict = proc
+        .check_safety(&intent)
+        .await
+        .map_err(|e| e.to_string())?;
     match verdict {
-        Verdict::Pass => Ok(SafetyResponse { passed: true, reasoning: None }),
-        Verdict::Block { reasoning, .. } => {
-            Ok(SafetyResponse { passed: false, reasoning: Some(reasoning) })
-        }
+        Verdict::Pass => Ok(SafetyResponse {
+            passed: true,
+            reasoning: None,
+        }),
+        Verdict::Block { reasoning, .. } => Ok(SafetyResponse {
+            passed: false,
+            reasoning: Some(reasoning),
+        }),
     }
 }
 
 #[tauri::command]
-pub async fn health_check(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<bool, String> {
+pub async fn health_check(processor: State<'_, Mutex<AppProcessor>>) -> Result<bool, String> {
     let proc = processor.lock().await;
     Ok(proc.health_check())
 }

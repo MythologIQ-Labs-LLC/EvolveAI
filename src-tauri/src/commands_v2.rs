@@ -146,9 +146,7 @@ pub async fn get_related(
 }
 
 #[tauri::command]
-pub async fn get_pending(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<Vec<String>, String> {
+pub async fn get_pending(processor: State<'_, Mutex<AppProcessor>>) -> Result<Vec<String>, String> {
     let proc = processor.lock().await;
     let addrs: Vec<String> = proc
         .pending_crystallizations()
