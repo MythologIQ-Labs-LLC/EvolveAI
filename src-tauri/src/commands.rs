@@ -54,6 +54,7 @@ pub async fn encode_memory(
     let now = chrono::Utc::now().timestamp_millis();
     let mut proc = processor.lock().await;
     let result = proc.encode(&input, now).await.map_err(|e| e.to_string())?;
+    crate::persistence::mark_dirty();
     Ok(EncodeResponse {
         address: result.unit.address.to_string(),
         tier: format!("{:?}", result.decision.tier),
@@ -142,5 +143,8 @@ pub async fn load_state(
 ) -> Result<(), String> {
     let mut proc = processor.lock().await;
     proc.load_from_file(std::path::Path::new(&path))
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // The in-memory state changed; sync the default autosave file to it.
+    crate::persistence::mark_dirty();
+    Ok(())
 }

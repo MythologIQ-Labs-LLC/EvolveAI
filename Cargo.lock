@@ -874,6 +874,7 @@ name = "evolve-app"
 version = "6.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "evolve-core",
  "serde",
  "serde_json",
