@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
   "productName": "EvolveAI",
-  "version": "0.1.0",
+  "version": "6.1.0",
   "identifier": "com.mythologiq.evolveai",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../dist-ui",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev:frontend",
     "beforeBuildCommand": "npm run build:frontend"

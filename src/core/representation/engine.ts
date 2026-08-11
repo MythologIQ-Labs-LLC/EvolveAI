@@ -8,7 +8,7 @@ import type {
   SimilarityStrategy,
   CrossModelResult,
   EngineCapabilities
-} from './types';
+} from './types.js';
 
 /**
  * Core abstraction for content representation.

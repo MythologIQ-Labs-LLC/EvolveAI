@@ -3,7 +3,9 @@
 **Generated**: 2026-03-19T06:30:00Z
 **Phase**: SUBSTANTIATE
 **Status**: SEALED
-**Version**: v5.9.0
+**Version**: v6.1.0
+
+Synchronized 2026-08-11 (docs alignment); see REPO_REVIEW-2026-08-11.md
 
 ---
 
@@ -24,7 +26,7 @@
 | Source provenance (TrustLevel) | v5.7 |
 | **Pressure-aware λ_base** | **v5.9** |
 
-## Backlog: 8 of 14 complete
+## Backlog: 7 of 14 complete (1 partial, 6 open)
 
 ---
 

@@ -4,15 +4,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockEngine } from '../../core/representation';
-import type { RepresentationEngine } from '../../core/representation/engine';
-import { createShadowGenome, type ShadowGenome } from '../../core/shadow/genome';
+import { createMockEngine } from '../../core/representation/index.js';
+import type { RepresentationEngine } from '../../core/representation/engine.js';
+import { createShadowGenome, type ShadowGenome } from '../../core/shadow/genome.js';
 import {
   bootstrapGenome,
   BOOTSTRAP_PATTERNS,
   getBootstrapPatternCount,
   getPatternsByCategory
-} from '../../core/shadow/bootstrap';
+} from '../../core/shadow/bootstrap.js';
 
 describe('Shadow Genome Bootstrap', () => {
   let engine: RepresentationEngine;

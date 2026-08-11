@@ -1,7 +1,7 @@
+use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::representation::types::{
     CrossModelResult, EngineCapabilities, Representation, SimilarityStrategy,
 };
-use crate::representation::engine::{EngineError, RepresentationEngine};
 use sha2::{Digest, Sha256};
 
 /// Mock engine for testing - generates hash-based representations
@@ -109,8 +109,7 @@ impl RepresentationEngine for MockEngine {
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Result<Representation, EngineError> {
-        Representation::from_bytes(bytes)
-            .map_err(|e| EngineError::DeserializationFailed(e))
+        Representation::from_bytes(bytes).map_err(EngineError::DeserializationFailed)
     }
 
     fn is_native(&self, rep: &Representation) -> bool {

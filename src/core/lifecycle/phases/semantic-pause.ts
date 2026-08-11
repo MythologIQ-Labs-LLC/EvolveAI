@@ -3,8 +3,8 @@
  * Safety check against Shadow Genome before execution
  */
 
-import type { SafetyVerdict, IntentPayload } from '../../shadow/interceptor';
-import type { ShadowInterceptor } from '../../shadow/interceptor';
+import type { SafetyVerdict, IntentPayload } from '../../shadow/interceptor.js';
+import type { ShadowInterceptor } from '../../shadow/interceptor.js';
 
 /**
  * Semantic pause result

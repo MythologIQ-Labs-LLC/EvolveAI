@@ -16,9 +16,7 @@ impl Block {
         let timestamp = chrono::Utc::now().timestamp_millis();
         let data_hash = "GENESIS".to_string();
         let previous_hash = "0".repeat(64);
-        let hash = crate::chain::hash::compute_block_hash(
-            0, timestamp, &data_hash, &previous_hash,
-        );
+        let hash = crate::chain::hash::compute_block_hash(0, timestamp, &data_hash, &previous_hash);
 
         Self {
             index: 0,
@@ -32,9 +30,8 @@ impl Block {
     /// Create a new block linking to the given previous hash.
     pub fn new(index: u64, data_hash: String, previous_hash: String) -> Self {
         let timestamp = chrono::Utc::now().timestamp_millis();
-        let hash = crate::chain::hash::compute_block_hash(
-            index, timestamp, &data_hash, &previous_hash,
-        );
+        let hash =
+            crate::chain::hash::compute_block_hash(index, timestamp, &data_hash, &previous_hash);
 
         Self {
             index,

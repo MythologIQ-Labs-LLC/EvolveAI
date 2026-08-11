@@ -9,15 +9,15 @@ export type {
   SchedulerStats,
   DecayEvent,
   DecayEventListener
-} from './types';
+} from './types.js';
 
 export {
   DEFAULT_SCHEDULER_CONFIG,
   createInitialStats
-} from './types';
+} from './types.js';
 
 // Scheduler implementation
 export {
   DecayScheduler,
   createDecayScheduler
-} from './decay-scheduler';
+} from './decay-scheduler.js';

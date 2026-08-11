@@ -6,13 +6,13 @@
 import type {
   GraphNode,
   GraphEdge,
-  ConsolidationResult,
-  EdgeType
-} from './types';
-import { isStableForCrystallization } from './node';
-import { isEdgeAlive, createEdge } from './edge';
-import { computeDecay } from '../memory/decay';
-import { now } from '../../lib/utils/time';
+  ConsolidationResult
+} from './types.js';
+export type { ConsolidationResult } from './types.js';
+import { isStableForCrystallization } from './node.js';
+import { isEdgeAlive } from './edge.js';
+import { computeDecay } from '../memory/decay.js';
+import { now } from '../../lib/utils/time.js';
 
 /**
  * Configuration for consolidation process

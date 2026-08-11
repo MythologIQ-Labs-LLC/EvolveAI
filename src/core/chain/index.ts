@@ -3,8 +3,8 @@
  * L3 UOR Vault cryptographic chain
  */
 
-export * from './types';
-export * from './hash';
-export * from './block';
-export * from './ledger';
-export * from './verify';
+export * from './types.js';
+export * from './hash.js';
+export * from './block.js';
+export * from './ledger.js';
+export * from './verify.js';

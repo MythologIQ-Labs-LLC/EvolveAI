@@ -14,51 +14,59 @@ EvolveAI is an exploration into theoretical agentic memory architecture—a lear
 - **Not cloud-dependent** - All core functionality operates locally
 - **Not a static database** - Memory must evolve, decay, and restructure
 
+## Two Codebases, One Repo
+
+The active product is the **Rust workspace**; the TypeScript prototype (v1.0–v2.1) is **frozen** and kept for reference only.
+
+| Location | What it is |
+|----------|------------|
+| `crates/evolve-core` | Rust core: thermodynamic memory model (decay, trust, zero-trust crystallization, hash-chained ledger) |
+| `crates/evolve-cli` | CLI binary (`evolve-cli`): 9 commands over persistent state in `~/.evolve/memory.json` |
+| `src-tauri/` | Tauri 2 desktop shell (crate `evolve-app`); frontend build wiring currently incomplete |
+| `ui/` | React frontend entry for the Tauri shell |
+| `src/`, `lib/`, `components/` | Legacy TypeScript prototype — frozen since 2026-03-18; 164 vitest tests |
+| `docs/` | Theory, plans (`plan-*.md`), BACKLOG, META_LEDGER (governance chain — never hand-edit) |
+| `vendor/GG-CORE` | Git submodule; **required** path dependency (`vendor/GG-CORE/core-runtime`) — clone with `--recurse-submodules` |
+
 ## Development Commands
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Development server (port 4000)
-npm run test         # Run tests (Vitest)
-npm run lint         # Lint
-npm run build        # Production build
+# Rust (the product)
+cargo test -p evolve-core -p evolve-cli   # Run core + CLI tests
+cargo run -p evolve-cli -- help           # Run the CLI
+cargo build -p evolve-app                 # Tauri shell (needs GTK/WebKit libs on Linux)
+
+# Legacy TypeScript prototype
+npm install
+npm test             # 164 vitest tests (frozen prototype)
+npm run typecheck    # Currently broken (see docs/REPO_REVIEW-2026-08-11.md)
+npm run lint         # Currently broken (no flat ESLint config)
 ```
 
 ## Architecture
 
-See [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) for the full contract.
+See [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) and [docs/REPO_REVIEW-2026-08-11.md](docs/REPO_REVIEW-2026-08-11.md).
 
-### Memory Subsystems
+### Memory Tiers (Rust core, `crates/evolve-core/src/tiers/`)
 
-| Subsystem | Purpose | Location |
-|-----------|---------|----------|
-| **Tiers** | STM/LTM with promotion/decay | `src/core/tiers/` |
-| **Graph** | Associative memory network | `src/core/graph/` |
-| **Chain** | Cryptographic integrity ledger | `src/core/chain/` |
-| **Memory** | Encoding/decoding/decay | `src/core/memory/` |
+| Tier | Name | Behavior |
+|------|------|----------|
+| L1 | Transient Cache | Fast vector cache, TTL eviction, aggressive decay |
+| L2 | Temporal Graph | CMHL decay, associative edges |
+| L3 | UOR Vault | Immutable hash chain, crystallized memories (λ = 0) |
 
-### Data Flow
-
-```
-[Input] -> Encoder -> TierRouter -> [STM|LTM] -> GraphNode -> HashChain
-[Query] -> Decoder -> GraphTraversal -> TierLookup -> DecayAdjust -> Result
-[Tick]  -> DecayEngine -> Promotion -> Consolidation -> HashChain
-```
+Other core modules: `chain/` (hash-chained ledger), `memory/` (encoding/decay), `shadow/` (Shadow Genome safety), `lifecycle/` (5-phase orchestrator), `simple/` (SimpleMemory facade used by CLI and Tauri), `processor/`, `representation/`.
 
 ## QoreLogic A.E.G.I.S. Status
 
 - **Genesis Hash**: `ece694ee280ee892649d195e6393e979cad072b076afa973816e925f01eb28b4`
-- **Final Hash**: `78293bb1eef2fc17d7fbc325c7c8d639026306fe2a237ef0f7f7b21f446a475f`
+- **Final Hash**: `f7d1a3ebe0833ba387f75ac00612de02440f739181c02fc947410f39d52838a8` (last recorded chain hash, Entry #80; the v6.1.0 seal entry #81 records no chain hash)
 - **Risk Grade**: L3 (cryptographic memory integrity)
-- **Lifecycle**: RELEASED (v1.0.0)
+- **Lifecycle**: RELEASED (v6.1.0)
 - **License**: Apache-2.0
 
-## Legacy Context
+The command family is `/qor-*` (e.g. `/qor-audit`, `/qor-substantiate`). Never hand-edit `docs/META_LEDGER.md`.
 
-The `_archive/` directory and existing `components/ui/` contain UI components from a previous AI assistant design. These may be retained and adapted for memory visualization, but the core architecture is new.
+## Path Aliases (legacy TS side)
 
-## Path Aliases
-
-- `@/components` → `./components`
-- `@/lib` → `./lib`
-- `@/hooks` → `./hooks`
+- `@/*` → `./src/*` (see `tsconfig.json`)

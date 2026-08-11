@@ -13,7 +13,10 @@ pub struct ChunkConfig {
 
 impl Default for ChunkConfig {
     fn default() -> Self {
-        Self { max_chunk_chars: 512, min_chunk_chars: 32 }
+        Self {
+            max_chunk_chars: 512,
+            min_chunk_chars: 32,
+        }
     }
 }
 

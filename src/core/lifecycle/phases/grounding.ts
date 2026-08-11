@@ -3,8 +3,8 @@
  * Establishes session context and loads soul file
  */
 
-import type { BaseContext, ContextConstraints, FiberBudget, LifecycleConfig } from '../types';
-import { now } from '../../../lib/utils/time';
+import type { BaseContext, ContextConstraints, FiberBudget, LifecycleConfig } from '../types.js';
+import { now } from '../../../lib/utils/time.js';
 
 /**
  * Grounding configuration

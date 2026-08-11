@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMemoryAdapter, type MemoryAdapter } from '../../core/storage';
+import { createMemoryAdapter, type MemoryAdapter } from '../../core/storage/index.js';
 
 describe('MemoryAdapter', () => {
   let adapter: MemoryAdapter<{ name: string; value: number }>;

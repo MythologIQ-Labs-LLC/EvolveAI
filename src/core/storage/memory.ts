@@ -3,7 +3,7 @@
  * In-memory implementation for testing and development
  */
 
-import type { StorageAdapter } from './types';
+import type { StorageAdapter } from './types.js';
 
 /**
  * In-memory storage adapter
