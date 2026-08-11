@@ -4,7 +4,7 @@
   "version": "6.1.0",
   "identifier": "com.mythologiq.evolveai",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../dist-ui",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev:frontend",
     "beforeBuildCommand": "npm run build:frontend"

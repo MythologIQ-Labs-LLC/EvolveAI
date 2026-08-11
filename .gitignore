@@ -94,3 +94,6 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Vite frontend build output (Tauri shell)
+dist-ui/

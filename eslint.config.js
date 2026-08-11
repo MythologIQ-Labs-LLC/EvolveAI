@@ -16,10 +16,36 @@ export default [
       'src-tauri/**',
       'components/**',
       'lib/**',
-      'ui/**',
       '_archive/**',
       'target/**',
     ],
+  },
+  {
+    // Tauri desktop frontend (plain React, no react eslint plugins needed:
+    // typescript-eslint's scope analysis already counts JSX references).
+    files: ['ui/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsParser,
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+    rules: {
+      ...tsPlugin.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
   {
     files: ['src/**/*.ts'],
