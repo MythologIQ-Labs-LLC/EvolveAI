@@ -344,6 +344,27 @@ npm run test:watch
 
 ---
 
+## Agent Memory Alignment
+
+This repository implements and experiments with **memory metabolism** — lifecycle orchestration, decay (CMHL), tier routing, and REM-synthesis consolidation — within the [Agent Memory](https://github.com/MythologIQ-Labs-LLC/agent-memory) reference architecture. EvolveAI's Autopoietic Memory Theory remains its own theoretical framework; this alignment maps responsibilities, it does not merge doctrines.
+
+Canonical doctrine this work maps to:
+
+- [Lifecycle state machine](https://github.com/MythologIQ-Labs-LLC/agent-memory/blob/main/docs/02-lifecycle-state-machine.md)
+- [Forgetting, consolidation, and memory metabolism](https://github.com/MythologIQ-Labs-LLC/agent-memory/blob/main/docs/21-forgetting-consolidation-and-memory-metabolism.md)
+- [PAMA — mutation authority](https://github.com/MythologIQ-Labs-LLC/agent-memory/blob/main/docs/pama/README.md)
+- [ADR-020 — governed uncertainty](https://github.com/MythologIQ-Labs-LLC/agent-memory/blob/main/docs/adr/ADR-020-probabilistic-discovery-deterministic-governance.md)
+- [Conformance test plan](https://github.com/MythologIQ-Labs-LLC/agent-memory/blob/main/docs/06-conformance-test-plan.md)
+
+The governing boundary: EvolveAI's learned and heuristic signals may **propose** decay, retention, consolidation, or promotion. They do not self-authorize irreversible or canonical state changes — transition proposal remains separate from transition commit.
+
+```text
+Implementation status: declared
+Conformance evidence:  none yet
+```
+
+---
+
 ## Contributing
 
 This is an experimental research project. Contributions should align with the project's anti-goals and core principles.
