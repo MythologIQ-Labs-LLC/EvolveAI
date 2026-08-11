@@ -84,7 +84,10 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
                 self.pin_session_peers(&unit.address, now);
                 self.session_log.push((unit.address.clone(), now));
             }
-            Tier::L3 => self.l3.store(unit.clone()),
+            Tier::L3 => self
+                .l3
+                .store(unit.clone())
+                .map_err(|e| EngineError::EncodingFailed(format!("L3 store rejected unit: {e}")))?,
         }
 
         Ok(EncodeResult { unit, decision })

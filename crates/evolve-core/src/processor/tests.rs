@@ -1351,3 +1351,171 @@ async fn test_pressure_adjusts_half_life_in_report() {
     assert!(report.pressure > 0.5);
     assert!(report.adjusted_half_life_ms < 3_600_000);
 }
+
+// --- L3 trust updates recorded in the ledger + persistence hardening (v6.2) ---
+
+#[tokio::test]
+async fn test_l3_trust_update_appends_chain_entry() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("vault secret", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+    assert_eq!(result.decision.tier, Tier::L3);
+    let addr = result.unit.address.clone();
+    let len_before = proc.stats().l3_chain_length;
+
+    assert!(proc.record_access(&addr, PinningEvent::Corroboration));
+
+    let stats = proc.stats();
+    assert_eq!(stats.l3_chain_length, len_before + 1);
+    assert!(stats.l3_integrity, "ledger must verify after trust update");
+}
+
+#[tokio::test]
+async fn test_l3_conflict_appends_chain_entry() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("disputed secret", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+    let len_before = proc.stats().l3_chain_length;
+
+    assert!(proc.record_conflict(&addr, 0.5).is_some());
+
+    let stats = proc.stats();
+    assert_eq!(stats.l3_chain_length, len_before + 1);
+    assert!(stats.l3_integrity, "ledger must verify after dispute");
+}
+
+#[tokio::test]
+async fn test_l3_trust_updated_state_survives_restore() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("evolving secret", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+    proc.record_access(&addr, PinningEvent::CryptoVerification);
+    proc.record_conflict(&addr, 0.05);
+    let snap = proc.snapshot(2000);
+
+    let engine2 = MockEngine::new(384);
+    let mut proc2 = MemoryProcessor::new(engine2, ProcessorConfig::default());
+    proc2.restore(snap).unwrap();
+    assert!(proc2.health_check());
+}
+
+#[tokio::test]
+async fn test_restore_detects_tampered_unit() {
+    use crate::processor::types::PersistError;
+
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("sealed secret", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+
+    let mut snap = proc.snapshot(2000);
+    // Tamper with the snapshot's L3 entry without touching the chain.
+    snap.l3_entries[0].saturation = 0.99;
+
+    let engine2 = MockEngine::new(384);
+    let mut proc2 = MemoryProcessor::new(engine2, ProcessorConfig::default());
+    let err = proc2.restore(snap).unwrap_err();
+    assert!(matches!(err, PersistError::UnitIntegrityFailed(_)));
+}
+
+#[test]
+fn test_restore_empty_blocks_errors_instead_of_panicking() {
+    use crate::processor::types::PersistError;
+
+    let snapshot = Snapshot {
+        version: "5.0.0".to_string(),
+        created_at: 1000,
+        l2_nodes: vec![],
+        l2_edges: std::collections::HashMap::new(),
+        l3_entries: vec![],
+        l3_blocks: vec![], // crafted/corrupt: no genesis block
+        shadow_entries: vec![],
+    };
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let err = proc.restore(snapshot).unwrap_err();
+    assert!(matches!(err, PersistError::MalformedChain(_)));
+}
+
+fn version_snapshot(version: &str) -> Snapshot {
+    Snapshot {
+        version: version.to_string(),
+        created_at: 1000,
+        l2_nodes: vec![],
+        l2_edges: std::collections::HashMap::new(),
+        l3_entries: vec![],
+        l3_blocks: vec![crate::chain::block::Block::genesis()],
+        shadow_entries: vec![],
+    }
+}
+
+#[test]
+fn test_restore_accepts_same_major_different_minor() {
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.restore(version_snapshot("5.1.7")).unwrap();
+}
+
+#[test]
+fn test_restore_rejects_different_major() {
+    use crate::processor::types::PersistError;
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let err = proc.restore(version_snapshot("4.0.0")).unwrap_err();
+    assert!(matches!(err, PersistError::IncompatibleVersion { .. }));
+}
+
+#[test]
+fn test_restore_rejects_garbage_version() {
+    use crate::processor::types::PersistError;
+    let engine = MockEngine::new(32);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    for garbage in ["banana", "", "5", "5.0", "5.0.0.0", "v5.0.0", "5.x.0"] {
+        let err = proc.restore(version_snapshot(garbage)).unwrap_err();
+        assert!(
+            matches!(err, PersistError::IncompatibleVersion { .. }),
+            "version {garbage:?} must be rejected"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_save_to_file_fsyncs_and_roundtrips() {
+    let dir = std::env::temp_dir().join("evolve-core-test-v62-fsync");
+    std::fs::create_dir_all(&dir).ok();
+    let path = dir.join("state.json");
+
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = proc
+        .encode(&make_input("durable secret", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+    proc.record_access(&addr, PinningEvent::Corroboration);
+    proc.save_to_file(&path, 2000).unwrap();
+
+    let engine2 = MockEngine::new(384);
+    let mut proc2 = MemoryProcessor::new(engine2, ProcessorConfig::default());
+    proc2.load_from_file(&path).unwrap();
+    assert!(proc2.health_check());
+    assert_eq!(proc2.stats().l3_size, 1);
+
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_dir(&dir).ok();
+}

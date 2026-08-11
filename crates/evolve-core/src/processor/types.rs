@@ -96,6 +96,10 @@ pub enum PersistError {
     ChainIntegrityFailed,
     #[error("incompatible snapshot version: expected {expected}, found {found}")]
     IncompatibleVersion { expected: String, found: String },
+    #[error("snapshot chain is malformed: {0}")]
+    MalformedChain(#[from] crate::chain::ledger::LedgerError),
+    #[error("unit content verification failed: {0}")]
+    UnitIntegrityFailed(#[from] crate::tiers::l3_vault::IntegrityError),
 }
 
 /// Build tier list from optional constraint.
