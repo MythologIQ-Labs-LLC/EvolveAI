@@ -12,11 +12,31 @@ pub struct EncodeResponse {
     pub mts_score: f32,
 }
 
+/// One ranked match from a query.
+///
+/// The core stores memories content-addressed (BLAKE3 address + embedding);
+/// the raw text itself is never retained, so there is no `content` field —
+/// the source and tags metadata are the human-readable handles.
+#[derive(Serialize)]
+pub struct QueryMatch {
+    pub address: String,
+    pub tier: String,
+    /// Relevance score against the query embedding (1.0 = exact L3 match).
+    pub score: f32,
+    /// CMHL decay weight at query time.
+    pub decayed_weight: f32,
+    pub saturation: f32,
+    pub source: Option<String>,
+    pub tags: Vec<String>,
+}
+
 #[derive(Serialize)]
 pub struct QueryResponse {
     pub count: usize,
     pub candidates_evaluated: usize,
     pub latency_ms: u64,
+    /// Ranked matches, best first (decoder top-k order).
+    pub results: Vec<QueryMatch>,
 }
 
 #[derive(Serialize)]
@@ -35,6 +55,17 @@ pub struct StatsResponse {
     pub l3_integrity: bool,
     pub phase: String,
     pub trace_count: usize,
+}
+
+/// Truncate a string to at most `max` characters (char-boundary safe),
+/// appending an ellipsis when anything was cut.
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max).collect();
+    out.push('…');
+    out
 }
 
 #[tauri::command]
@@ -74,10 +105,25 @@ pub async fn query_memory(
     let now = chrono::Utc::now().timestamp_millis();
     let proc = processor.lock().await;
     let result = proc.query(&query, now).await.map_err(|e| e.to_string())?;
+    let results: Vec<QueryMatch> = result
+        .recall
+        .memories
+        .iter()
+        .map(|m| QueryMatch {
+            address: m.unit.address.to_string(),
+            tier: format!("{:?}", m.unit.metadata.tier),
+            score: m.relevance_score,
+            decayed_weight: m.decayed_weight,
+            saturation: m.unit.saturation,
+            source: m.unit.metadata.source.as_ref().map(|s| truncate(s, 200)),
+            tags: m.unit.metadata.tags.clone(),
+        })
+        .collect();
     Ok(QueryResponse {
         count: result.recall.memories.len(),
         candidates_evaluated: result.recall.metrics.candidates_evaluated,
         latency_ms: result.latency_ms,
+        results,
     })
 }
 

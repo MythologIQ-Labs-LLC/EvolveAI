@@ -10,10 +10,27 @@ export interface EncodeResponse {
   mts_score: number;
 }
 
+/**
+ * One ranked match. The core stores memories content-addressed (BLAKE3
+ * address + embedding); raw text is never retained, so source/tags are the
+ * human-readable handles.
+ */
+export interface QueryMatch {
+  address: string;
+  tier: string;
+  score: number;
+  decayed_weight: number;
+  saturation: number;
+  source: string | null;
+  tags: string[];
+}
+
 export interface QueryResponse {
   count: number;
   candidates_evaluated: number;
   latency_ms: number;
+  /** Ranked matches, best first (decoder top-k order). */
+  results: QueryMatch[];
 }
 
 export interface SafetyResponse {
@@ -53,6 +70,35 @@ export interface SloResponse {
   circuit_open: boolean;
   pressure: number;
   adjusted_half_life_ms: number;
+}
+
+export interface IngestResponse {
+  source: string;
+  chunks: number;
+  addresses: string[];
+}
+
+export interface DecayTickResponse {
+  l1_examined: number;
+  l1_evicted: number;
+  l2_examined: number;
+  l2_pruned: number;
+  l2_promoted: number;
+  l3_examined: number;
+}
+
+export interface DetachResponse {
+  synthesized: boolean;
+  traces_processed: number;
+  decay: DecayTickResponse | null;
+}
+
+export interface ShadowStatsResponse {
+  total_entries: number;
+  active_entries: number;
+  total_triggers: number;
+  /** [category Debug name (e.g. "IntegrationFailure"), entry count]. */
+  by_category: [string, number][];
 }
 
 /** Matches commands_v2::parse_pinning_event on the Rust side. */
@@ -103,3 +149,13 @@ export const getRelated = (address: string) =>
   invoke<string[]>("get_related", { address });
 
 export const getPending = () => invoke<string[]>("get_pending");
+
+export const ingestFile = (path: string) =>
+  invoke<IngestResponse>("ingest_file", { path });
+
+export const runDecayTick = () => invoke<DecayTickResponse>("run_decay_tick");
+
+export const detach = () => invoke<DetachResponse>("detach");
+
+export const getShadowStats = () =>
+  invoke<ShadowStatsResponse>("get_shadow_stats");

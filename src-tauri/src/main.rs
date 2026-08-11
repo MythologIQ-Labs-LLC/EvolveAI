@@ -2,6 +2,7 @@
 
 mod commands;
 mod commands_v2;
+mod commands_v3;
 mod persistence;
 mod state;
 
@@ -21,6 +22,8 @@ fn main() {
             }
             // Start the debounced autosave task (fed by persistence::mark_dirty).
             persistence::spawn_autosave(app.handle().clone());
+            // Start the periodic metabolism task (background decay ticks).
+            persistence::spawn_metabolism(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -39,6 +42,10 @@ fn main() {
             commands_v2::get_slo_report,
             commands_v2::get_related,
             commands_v2::get_pending,
+            commands_v3::ingest_file,
+            commands_v3::run_decay_tick,
+            commands_v3::detach,
+            commands_v3::get_shadow_stats,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application");
@@ -52,7 +59,15 @@ fn main() {
         // failure mode on this thread).
         tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
             let processor = app_handle.state::<Mutex<state::AppProcessor>>();
-            tauri::async_runtime::block_on(persistence::save_default(&processor));
+            tauri::async_runtime::block_on(async {
+                // Detach before the final save so REM-synthesis consolidation
+                // (prune/promote + trace processing) lands in the persisted
+                // state across sessions. An idle app has nothing to detach —
+                // the InvalidPhase error is expected and ignored.
+                let now = chrono::Utc::now().timestamp_millis();
+                let _ = processor.lock().await.detach(now);
+                persistence::save_default(&processor).await;
+            });
         }
         _ => {}
     });

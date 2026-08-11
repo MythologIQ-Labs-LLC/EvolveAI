@@ -22,8 +22,12 @@
 //!   saves at most once per debounce window. The `Notify` permit semantics
 //!   guarantee the final state of a burst is always persisted: a signal that
 //!   arrives during a save leaves a stored permit, triggering one more save.
-//! - **Exit** (`save_default` via the `RunEvent` hook in `main.rs`): a final
-//!   synchronous save on `ExitRequested` / `Exit`.
+//! - **Periodically** ([`spawn_metabolism`]): a background decay tick runs
+//!   every ten minutes; it signals the autosave only when the tick actually
+//!   evicted, pruned, or promoted something.
+//! - **Exit** (via the `RunEvent` hook in `main.rs`): a `detach()` attempt
+//!   (REM-synthesis consolidation; a no-op for an idle app) followed by a
+//!   final synchronous `save_default`.
 //!
 //! Saves go through `MemoryProcessor::save_to_file`, which writes atomically
 //! (tmp-then-rename), so a crash mid-save cannot corrupt the previous file.
@@ -37,6 +41,9 @@ use tokio::sync::{Mutex, Notify};
 /// Debounce window for autosave: bursts of mutations within this window
 /// collapse into (at most) two saves, the last of which sees the final state.
 const DEBOUNCE_MS: u64 = 750;
+
+/// Interval between background metabolism ticks (decay / prune / promote).
+const METABOLISM_INTERVAL_SECS: u64 = 600;
 
 /// Directory holding persistent state: `~/.evolve` (shared with the CLI).
 pub fn state_dir() -> PathBuf {
@@ -118,10 +125,7 @@ pub async fn load_default(processor: &Mutex<AppProcessor>) {
                     "[persist] preserved unreadable state at {}",
                     backup.display()
                 ),
-                Err(re) => eprintln!(
-                    "[persist] could not preserve {}: {re}",
-                    path.display()
-                ),
+                Err(re) => eprintln!("[persist] could not preserve {}: {re}", path.display()),
             }
         }
     }
@@ -142,6 +146,31 @@ pub fn spawn_autosave(app: tauri::AppHandle) {
             tokio::time::sleep(std::time::Duration::from_millis(DEBOUNCE_MS)).await;
             let processor = app.state::<Mutex<AppProcessor>>();
             save_default(&processor).await;
+        }
+    });
+}
+
+/// Spawn the periodic metabolism task on Tauri's async runtime.
+///
+/// Every [`METABOLISM_INTERVAL_SECS`] the task runs one decay tick over the
+/// tiers (L1 TTL eviction, L2 CMHL pruning, Auto-policy promotion). The
+/// autosave is signaled only when the report shows something actually
+/// changed — a no-op tick must not churn the state file.
+pub fn spawn_metabolism(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(METABOLISM_INTERVAL_SECS));
+        // The first tick of a tokio interval fires immediately; skip it so
+        // startup (right after load) is not followed by a pointless tick.
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            let processor = app.state::<Mutex<AppProcessor>>();
+            let now = chrono::Utc::now().timestamp_millis();
+            let report = processor.lock().await.run_decay_tick(now);
+            if report.l1_evicted + report.l2_pruned + report.l2_promoted > 0 {
+                mark_dirty();
+            }
         }
     });
 }

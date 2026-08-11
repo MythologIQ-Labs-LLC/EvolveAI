@@ -6,15 +6,58 @@ import * as api from "./api";
 import { Badge, KV, Output, Row, Section, useCall } from "./common";
 
 // ---------------------------------------------------------------------------
-// Memory: encode, query, forget, related
+// Memory: encode, query, ingest, forget, related
 // ---------------------------------------------------------------------------
+
+/** Ranked query matches. Content itself is not stored by the core (memories
+ *  are content-addressed hashes + embeddings), so source/tags stand in. */
+function ResultsTable(props: { results: api.QueryMatch[] }) {
+  if (props.results.length === 0) {
+    return <div className="muted">No matches.</div>;
+  }
+  return (
+    <table className="results">
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Score</th>
+          <th>Saturation</th>
+          <th>Source / tags</th>
+          <th>Address</th>
+        </tr>
+      </thead>
+      <tbody>
+        {props.results.map((m) => (
+          <tr key={m.address}>
+            <td>
+              <span className="badge badge-tier">{m.tier}</span>
+            </td>
+            <td>{m.score.toFixed(4)}</td>
+            <td>{m.saturation.toFixed(4)}</td>
+            <td className="results-source">
+              {m.source ?? <span className="muted">—</span>}
+              {m.tags.length > 0 && (
+                <div className="muted">{m.tags.join(", ")}</div>
+              )}
+            </td>
+            <td>
+              <code title={m.address}>{m.address.slice(0, 12)}…</code>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export function MemoryPanel() {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [address, setAddress] = useState("");
+  const [ingestPath, setIngestPath] = useState("");
   const encode = useCall<api.EncodeResponse>();
   const query = useCall<api.QueryResponse>();
+  const ingest = useCall<api.IngestResponse>();
   const forget = useCall<boolean>();
   const related = useCall<string[]>();
 
@@ -58,11 +101,36 @@ export function MemoryPanel() {
       <Output
         state={query.state}
         render={(r) => (
+          <>
+            <KV
+              items={[
+                ["Matches", r.count],
+                ["Candidates evaluated", r.candidates_evaluated],
+                ["Latency", `${r.latency_ms} ms`],
+              ]}
+            />
+            <ResultsTable results={r.results} />
+          </>
+        )}
+      />
+      <Row>
+        <input
+          value={ingestPath}
+          onChange={(e) => setIngestPath(e.target.value)}
+          placeholder="File path to ingest (chunked into memories)"
+        />
+        <button onClick={() => ingest.run(() => api.ingestFile(ingestPath))}>
+          Ingest
+        </button>
+      </Row>
+      <Output
+        state={ingest.state}
+        render={(r) => (
           <KV
             items={[
-              ["Matches", r.count],
-              ["Candidates evaluated", r.candidates_evaluated],
-              ["Latency", `${r.latency_ms} ms`],
+              ["Source", r.source],
+              ["Chunks encoded", r.chunks],
+              ["Units created", r.addresses.length],
             ]}
           />
         )}
@@ -305,6 +373,91 @@ export function PersistencePanel() {
       </Row>
       <Output state={save.state} render={() => <Badge ok yes="Saved" no="" />} />
       <Output state={load.state} render={() => <Badge ok yes="Loaded" no="" />} />
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Metabolism: decay tick, detach (REM synthesis), shadow genome stats
+// ---------------------------------------------------------------------------
+
+/** "IntegrationFailure" -> "Integration failure". */
+function humanizeCategory(name: string): string {
+  const spaced = name.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0) + spaced.slice(1).toLowerCase();
+}
+
+function DecayReport(props: { report: api.DecayTickResponse }) {
+  const r = props.report;
+  return (
+    <KV
+      items={[
+        ["L1", `${r.l1_examined} examined, ${r.l1_evicted} evicted`],
+        [
+          "L2",
+          `${r.l2_examined} examined, ${r.l2_pruned} pruned, ${r.l2_promoted} promoted`,
+        ],
+        ["L3", `${r.l3_examined} examined (never pruned)`],
+      ]}
+    />
+  );
+}
+
+export function MetabolismPanel() {
+  const tick = useCall<api.DecayTickResponse>();
+  const det = useCall<api.DetachResponse>();
+  const shadow = useCall<api.ShadowStatsResponse>();
+
+  return (
+    <Section title="Metabolism">
+      <Row>
+        <button onClick={() => tick.run(() => api.runDecayTick())}>Decay tick</button>
+        <button onClick={() => det.run(() => api.detach())}>Detach</button>
+        <button onClick={() => shadow.run(() => api.getShadowStats())}>
+          Shadow Genome stats
+        </button>
+      </Row>
+      <Output state={tick.state} render={(r) => <DecayReport report={r} />} />
+      <Output
+        state={det.state}
+        render={(r) => (
+          <>
+            {r.synthesized ? (
+              <Badge ok yes={`Synthesized (${r.traces_processed} traces processed)`} no="" />
+            ) : (
+              <div className="muted">
+                Detached — trace count below synthesis threshold; no REM pass.
+              </div>
+            )}
+            {r.decay && <DecayReport report={r.decay} />}
+          </>
+        )}
+      />
+      <Output
+        state={shadow.state}
+        render={(s) => (
+          <KV
+            items={[
+              ["Entries (total / active)", `${s.total_entries} / ${s.active_entries}`],
+              ["Total triggers", s.total_triggers],
+              [
+                "By category",
+                s.by_category.length === 0 ? (
+                  "—"
+                ) : (
+                  <ul className="addr-list" key="cats">
+                    {s.by_category.map(([cat, n]) => (
+                      <li key={cat}>
+                        {humanizeCategory(cat)}: {n}
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              ],
+            ]}
+          />
+        )}
+      />
     </Section>
   );
 }

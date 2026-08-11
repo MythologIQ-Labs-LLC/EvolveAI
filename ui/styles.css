@@ -203,6 +203,36 @@ td.kv-key {
   border-color: var(--bad);
 }
 
+.badge-tier {
+  color: var(--accent);
+  border-color: var(--accent);
+  margin: 0;
+}
+
+table.results {
+  margin: 8px 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.results th {
+  color: var(--muted);
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.results th,
+table.results td {
+  border-bottom: 1px solid var(--border);
+  padding: 4px 8px 4px 0;
+  vertical-align: top;
+}
+
+td.results-source {
+  word-break: break-word;
+}
+
 ul.addr-list {
   margin: 8px 0;
   padding-left: 18px;

@@ -6,6 +6,7 @@ import * as api from "./api";
 import { Badge, KV, Output, Row, useCall } from "./common";
 import {
   MemoryPanel,
+  MetabolismPanel,
   PersistencePanel,
   ProfilePanel,
   SafetyPanel,
@@ -61,6 +62,7 @@ export function App() {
       <main className="grid">
         <MemoryPanel />
         <TrustPanel />
+        <MetabolismPanel />
         <ProfilePanel />
         <SafetyPanel />
         <PersistencePanel />
