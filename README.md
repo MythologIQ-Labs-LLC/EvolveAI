@@ -2,6 +2,8 @@
 
 An exploration into theoretical agentic memory architecture—a learning computer that evolves its own neural network-like memory structures rather than serving as a static assistant.
 
+**Current version**: v6.1.0 (see [docs/META_LEDGER.md](docs/META_LEDGER.md))
+
 ## Overview
 
 EvolveAI implements the **Autopoietic Memory Theory**, a novel approach to machine cognition that treats memory as a self-maintaining, self-organizing system. Unlike traditional databases or retrieval-augmented generation (RAG) systems, EvolveAI's memory actively evolves, decays, and restructures based on usage patterns.
@@ -23,11 +25,89 @@ This project is explicitly **NOT**:
 
 ---
 
+## What's in this repository
+
+The project has been rewritten in Rust (v3.0 onward); the original TypeScript prototype is kept frozen for reference.
+
+| Component | Location | State |
+|-----------|----------|-------|
+| **Rust core** — thermodynamic memory model: decay, trust scoring, zero-trust crystallization, hash-chained ledger | `crates/evolve-core` | Active (the product) |
+| **CLI** — 9 commands over persistent state in `~/.evolve/memory.json` | `crates/evolve-cli` | Active |
+| **Desktop shell** — Tauri 2 app exposing the memory commands | `src-tauri` (frontend entry in `ui/`) | Active; frontend build wiring incomplete (see [REPO_REVIEW-2026-08-11](docs/REPO_REVIEW-2026-08-11.md)) |
+| **Legacy TypeScript prototype** (v1.0–v2.1) | `src/`, `lib/`, `components/` | Frozen since 2026-03-18; 164 vitest tests still pass; superseded by the Rust rewrite |
+| **Vendored dependency** — GG-CORE runtime (git submodule) | `vendor/GG-CORE` | Required path dependency |
+
+---
+
+## Getting Started
+
+### Clone
+
+The Cargo workspace has a path dependency on `vendor/GG-CORE/core-runtime`, so the submodule is **required** — a clone without it will not build.
+
+```bash
+git clone --recurse-submodules https://github.com/MythologIQ-Labs-LLC/EvolveAI.git
+cd EvolveAI
+
+# If you already cloned without submodules:
+git submodule update --init --recursive
+```
+
+### Rust core and CLI
+
+```bash
+# Run the test suites
+cargo test -p evolve-core -p evolve-cli
+
+# Run the CLI (state persists to ~/.evolve/memory.json)
+cargo run -p evolve-cli -- help
+cargo run -p evolve-cli -- add "Important fact to remember"
+cargo run -p evolve-cli -- search "important fact"
+```
+
+CLI commands:
+
+| Command | Purpose |
+|---------|---------|
+| `add <content...>` | Store a memory, print its address |
+| `search <query...>` | Find memories by relevance |
+| `forget <address>` | Delete a memory by address |
+| `feedback <address>` | Pin fibers (CrossReference event) |
+| `dispute <address> [sev]` | Inject entropy (default severity 0.5) |
+| `approve <address>` | Approve crystallization (L2→L3) |
+| `profile` | Show cognitive profile summary |
+| `slo` | Show SLO report |
+| `ingest <file>` | Ingest a text file as memory chunks |
+
+### Desktop app (Tauri 2)
+
+Building the Tauri shell on Linux requires the GTK/WebKit system libraries, e.g. on Debian/Ubuntu:
+
+```bash
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+  build-essential curl wget file libssl-dev libayatana-appindicator3-dev
+```
+
+Then build the shell crate with `cargo build -p evolve-app`. Note: the frontend dev/build wiring referenced by `tauri.conf.json` is currently incomplete — see the [repository review](docs/REPO_REVIEW-2026-08-11.md) for status and roadmap.
+
+### Legacy TypeScript prototype
+
+The frozen v1–v2 prototype still runs its own test suite:
+
+```bash
+npm install
+npm test          # 164 vitest tests
+```
+
+(`npm run build` / `npm run lint` are currently broken on the legacy side; see the repository review.)
+
+---
+
 ## Architecture
 
 ### Neural Net Processor
 
-The **Neural Net Processor** serves as the computational engine implementing the Autopoietic Memory Theory. It orchestrates:
+The **Neural Net Processor** is the computational engine implementing the Autopoietic Memory Theory:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -66,8 +146,6 @@ The **Neural Net Processor** serves as the computational engine implementing the
 
 ### 5-Phase Metabolic Lifecycle
 
-Each cognitive cycle progresses through five distinct phases:
-
 1. **GROUNDING** — Establish session context, load soul file, allocate fiber budget
 2. **SEMANTIC_PAUSE** — Safety check against Shadow Genome before execution
 3. **ACTIVE_FLOW** — Execute operations with full pipeline tracing
@@ -82,24 +160,13 @@ Each cognitive cycle progresses through five distinct phases:
 | L2 | Temporal Graph | CMHL decay, edge traversal, semantic relationships | λ = 0.001 (moderate) |
 | L3 | UOR Vault | Immutable hash chain, O(1) lookup, cryptographic verification | λ = 0 (immortal) |
 
-### Memory Tier Score (MTS) Routing
-
-Memories are routed to tiers using the MTS algorithm:
+Memories are routed to tiers by the Memory Tier Score (MTS):
 
 ```
 MTS = (S × Ws) + (A × Wa) + (P × Wp) - (C × Wc)
 ```
 
-Where:
-- **S** = Sensitivity (personal data, secrets)
-- **A** = Accuracy requirement (facts, references)
-- **P** = Privilege level (core knowledge, foundational)
-- **C** = Compute constraint (current resource availability)
-
-Routing thresholds:
-- MTS > 0.8 → L3 (UOR Vault)
-- MTS > 0.3 → L2 (Temporal Graph)
-- MTS ≤ 0.3 → L1 (Transient Cache)
+with **S** = sensitivity, **A** = accuracy requirement, **P** = privilege level, **C** = compute constraint. MTS > 0.8 → L3, MTS > 0.3 → L2, otherwise L1.
 
 ### CMHL: Cryptographic Memory Half-Life
 
@@ -109,10 +176,7 @@ Decay is computed lazily on retrieval using exponential decay:
 w_current = w₀ × e^(-λt)
 ```
 
-Where:
-- `w₀` = initial weight (salience at encoding)
-- `λ` = decay constant (tier-specific)
-- `t` = time since last access
+where `w₀` is the initial weight (salience at encoding), `λ` the tier-specific decay constant, and `t` the time since last access.
 
 ### Shadow Genome
 
@@ -124,211 +188,11 @@ A negative-constraint immune system that blocks execution when intent matches kn
 
 ---
 
-## Project Structure
+## Project Status
 
-```
-src/
-├── core/
-│   ├── processor/          # Main NeuralNetProcessor facade
-│   │   ├── index.ts        # Processor class and factory
-│   │   ├── types.ts        # Public type definitions
-│   │   └── config.ts       # Unified configuration
-│   │
-│   ├── memory/             # Memory encoding/decoding
-│   │   ├── types.ts        # MemoryUnit, Query, RecallResult
-│   │   ├── encoder.ts      # Input → MemoryUnit encoding
-│   │   ├── decoder.ts      # Query → RecallResult decoding
-│   │   └── decay.ts        # CMHL decay engine
-│   │
-│   ├── tiers/              # Tiered memory storage
-│   │   ├── router.ts       # MTS calculation and routing
-│   │   ├── l1-cache.ts     # Transient vector cache
-│   │   ├── l2-graph.ts     # Temporal graph with decay
-│   │   └── l3-vault.ts     # UOR vault interface
-│   │
-│   ├── graph/              # Graph data structures
-│   │   ├── node.ts         # GraphNode definition
-│   │   ├── edge.ts         # Decay-weighted edges
-│   │   ├── traversal.ts    # BFS/DFS with CMHL
-│   │   └── consolidation.ts # Graph pruning
-│   │
-│   ├── chain/              # L3 hash chain
-│   │   ├── hash.ts         # SHA256/UOR hashing
-│   │   ├── block.ts        # Block structure
-│   │   ├── ledger.ts       # Chain management
-│   │   └── verify.ts       # Integrity verification
-│   │
-│   ├── shadow/             # Safety system
-│   │   ├── genome.ts       # Shadow Genome store
-│   │   ├── interceptor.ts  # Semantic pause interceptor
-│   │   └── failure-types.ts # Failure taxonomy
-│   │
-│   └── lifecycle/          # 5-Phase orchestration
-│       ├── orchestrator.ts # State machine
-│       ├── trace.ts        # Pipeline tracing
-│       └── phases/         # Phase implementations
-│           ├── grounding.ts
-│           ├── semantic-pause.ts
-│           ├── active-flow.ts
-│           ├── detachment.ts
-│           └── rem-synthesis.ts
-│
-├── lib/
-│   └── utils/              # Utility functions
-│       ├── hash.ts         # Cryptographic hashing
-│       ├── time.ts         # Temporal utilities
-│       └── id.ts           # UOR ID generation
-│
-└── tests/                  # Test suite
-    ├── core/               # Unit tests
-    ├── integration/        # Integration tests
-    └── fixtures/           # Test data
-```
-
----
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/evolve-ai.git
-cd evolve-ai
-
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-```
-
-## Usage
-
-### Basic Usage
-
-```typescript
-import { createProcessor } from './src/core/processor';
-
-// Create processor with default configuration
-const processor = createProcessor();
-
-// Initialize the memory system
-const initResult = await processor.initialize({
-  identity: 'my-agent'
-});
-
-console.log(`Session: ${initResult.sessionId}`);
-console.log(`Genesis Hash: ${initResult.genesisHash}`);
-
-// Encode a memory
-const encodeResult = await processor.encode({
-  content: 'Important fact to remember',
-  metadata: { tags: ['fact', 'reference'] }
-});
-
-console.log(`Stored in: ${encodeResult.tierDecision.tier}`);
-
-// Query memories
-const queryResult = await processor.query({
-  content: 'What facts do I know?',
-  embedding: myEmbeddingFunction('What facts do I know?'),
-  context: { intent: 'recall' }
-});
-
-console.log(`Found ${queryResult.recall.memories.length} memories`);
-
-// Shutdown
-processor.shutdown();
-```
-
-### Custom Configuration
-
-```typescript
-import { createProcessor, createProcessorConfig } from './src/core/processor';
-
-const config = createProcessorConfig({
-  lifecycle: {
-    synthesisThreshold: 20,
-    detachmentStrategy: 'batched'
-  },
-  tierThresholds: {
-    l3: 0.9,  // More selective for L3
-    l2: 0.4
-  },
-  interceptor: {
-    safetyThreshold: 0.9,  // Stricter safety
-    criticalCategories: ['SECURITY_REGRESSION', 'HALLUCINATION']
-  }
-});
-
-const processor = createProcessor(config);
-```
-
-### Event Handling
-
-```typescript
-const processor = createProcessor();
-
-// Subscribe to events
-const unsubscribe = processor.on((event) => {
-  switch (event.type) {
-    case 'MEMORY_ENCODED':
-      console.log(`Encoded ${event.unitId} to ${event.tier}`);
-      break;
-    case 'SAFETY_BLOCK':
-      console.warn(`Blocked: ${event.reason}`);
-      break;
-    case 'SYNTHESIS_COMPLETE':
-      console.log(`Crystallized ${event.result.crystallized} memories`);
-      break;
-  }
-});
-
-// Later: unsubscribe
-unsubscribe();
-```
-
----
-
-## Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run specific test file
-npm test -- src/tests/core/decay.test.ts
-
-# Watch mode
-npm run test:watch
-```
-
-### Test Coverage
-
-| Module | Status | Coverage |
-|--------|--------|----------|
-| `core/memory/decay` | ✅ Implemented | Unit tests |
-| `core/chain/*` | ✅ Implemented | Unit tests |
-| `core/tiers/router` | ✅ Implemented | Unit tests |
-| `core/lifecycle/*` | ✅ Implemented | Unit tests |
-| `core/graph/*` | ⚠️ Partial | Needs integration tests |
-| `core/shadow/*` | ⚠️ Partial | Needs integration tests |
-| `core/processor` | ⚠️ Partial | Needs end-to-end tests |
-
-### Test Gaps (TODO)
-
-1. **Encoder/Decoder Integration** — Test full encode→store→query→decode flow
-2. **Graph Traversal Edge Cases** — Test cycles, disconnected components, large graphs
-3. **Shadow Genome Effectiveness** — Test blocking accuracy, false positive rates
-4. **L3 Vault Persistence** — Test export/import, recovery from corruption
-5. **Lifecycle Edge Transitions** — Test error recovery, timeout handling
-6. **Memory Pressure** — Test behavior under L1 eviction pressure
-7. **Concurrent Operations** — Test parallel encode/query operations
-8. **Embedding Model Integration** — Test with actual embedding models (MiniLM)
+- **Lifecycle**: RELEASED (v6.1.0), governed by the QoreLogic A.E.G.I.S. meta-ledger (81 chained entries).
+- **Backlog**: 7 of 14 items complete, 1 partial, 6 open — next up is **BL-001 (deterministic policy gate)**, which unblocks BL-002/003/007. See [docs/BACKLOG.md](docs/BACKLOG.md).
+- **Known gaps and roadmap**: see [docs/REPO_REVIEW-2026-08-11.md](docs/REPO_REVIEW-2026-08-11.md).
 
 ---
 
@@ -338,9 +202,16 @@ npm run test:watch
 |----------|-------------|
 | [CONCEPT.md](docs/CONCEPT.md) | Project DNA — Why, Vibe, Anti-Goals |
 | [ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) | Original architecture blueprint |
-| [NEURAL_NET_PROCESSOR_DESIGN.md](docs/NEURAL_NET_PROCESSOR_DESIGN.md) | Detailed design specification |
 | [AUTOPOIETIC_MEMORY_THEORY.md](docs/AUTOPOIETIC_MEMORY_THEORY.md) | Theoretical foundations |
-| [META_LEDGER.md](docs/META_LEDGER.md) | QoreLogic governance chain |
+| [NEURAL_NET_PROCESSOR_DESIGN.md](docs/NEURAL_NET_PROCESSOR_DESIGN.md) | Detailed design specification |
+| [SHADOW_GENOME.md](docs/SHADOW_GENOME.md) | Failure-pattern immune system |
+| [PRISM_UOR_MDK_SUMMARY.md](docs/PRISM_UOR_MDK_SUMMARY.md) | UOR identity algebra summary |
+| [BACKLOG.md](docs/BACKLOG.md) | Research-sourced backlog with status table |
+| [SYSTEM_STATE.md](docs/SYSTEM_STATE.md) | Sealed system state snapshot |
+| [META_LEDGER.md](docs/META_LEDGER.md) | QoreLogic governance chain (do not hand-edit) |
+| [REPO_REVIEW-2026-08-11.md](docs/REPO_REVIEW-2026-08-11.md) | Product-readiness review and roadmap |
+| `docs/plan-*.md` | Per-release implementation plans (v2 → v6.1) |
+| `docs/Research/` | Comparative research artifacts |
 
 ---
 
@@ -350,7 +221,7 @@ This is an experimental research project. Contributions should align with the pr
 
 ### Development Workflow
 
-1. All changes must pass the Gate Tribunal audit (`/ql-audit`)
+1. All changes must pass the Gate Tribunal audit (`/qor-audit` — the QoreLogic command family is `qor-*`)
 2. Code must adhere to Section 4 Razor constraints:
    - Functions ≤ 40 lines
    - Files ≤ 250 lines
