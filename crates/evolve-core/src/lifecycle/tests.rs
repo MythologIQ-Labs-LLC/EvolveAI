@@ -64,7 +64,10 @@ fn test_record_operation_consumes_budget() {
 
 #[test]
 fn test_detach_below_threshold() {
-    let config = LifecycleConfig { synthesis_threshold: 100, ..Default::default() };
+    let config = LifecycleConfig {
+        synthesis_threshold: 100,
+        ..Default::default()
+    };
     let mut orch = Orchestrator::new("s".into(), config);
     orch.start_session(1000).unwrap();
     orch.begin_operation(true, 2000).unwrap();
@@ -77,7 +80,10 @@ fn test_detach_below_threshold() {
 
 #[test]
 fn test_detach_above_threshold() {
-    let config = LifecycleConfig { synthesis_threshold: 2, ..Default::default() };
+    let config = LifecycleConfig {
+        synthesis_threshold: 2,
+        ..Default::default()
+    };
     let mut orch = Orchestrator::new("s".into(), config);
     orch.start_session(1000).unwrap();
     orch.begin_operation(true, 2000).unwrap();
@@ -91,7 +97,10 @@ fn test_detach_above_threshold() {
 
 #[test]
 fn test_complete_synthesis_returns_traces() {
-    let config = LifecycleConfig { synthesis_threshold: 1, ..Default::default() };
+    let config = LifecycleConfig {
+        synthesis_threshold: 1,
+        ..Default::default()
+    };
     let mut orch = Orchestrator::new("s".into(), config);
     orch.start_session(1000).unwrap();
     orch.begin_operation(true, 2000).unwrap();

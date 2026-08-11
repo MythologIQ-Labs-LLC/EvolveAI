@@ -3,9 +3,9 @@
  * Negative-constraint immune system tracking failure patterns
  */
 
-import type { FailureTrace, FailureCategory } from './failure-types';
-import { now } from '../../lib/utils/time';
-import { sha256 } from '../../lib/utils/hash';
+import type { FailureTrace, FailureCategory } from './failure-types.js';
+import { now } from '../../lib/utils/time.js';
+import { sha256 } from '../../lib/utils/hash.js';
 
 /**
  * A stored shadow entry (vectorized failure pattern)

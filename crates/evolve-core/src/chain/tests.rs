@@ -94,3 +94,27 @@ fn test_content_address_different_inputs() {
     let a2 = content_address("beta");
     assert_ne!(a1, a2);
 }
+
+// --- try_from_blocks (v6.2 persistence robustness) ---
+
+#[test]
+fn test_try_from_blocks_rejects_empty() {
+    let result = Ledger::try_from_blocks(vec![]);
+    assert_eq!(result.unwrap_err(), LedgerError::EmptyBlocks);
+}
+
+#[test]
+fn test_try_from_blocks_accepts_genesis() {
+    let ledger = Ledger::try_from_blocks(vec![Block::genesis()]).unwrap();
+    assert_eq!(ledger.len(), 1);
+    assert!(ledger.verify());
+}
+
+#[test]
+fn test_from_blocks_delegates_to_try_from_blocks() {
+    let mut source = Ledger::new();
+    source.append("abc".to_string());
+    let ledger = Ledger::from_blocks(source.blocks().to_vec());
+    assert_eq!(ledger.len(), 2);
+    assert!(ledger.verify());
+}

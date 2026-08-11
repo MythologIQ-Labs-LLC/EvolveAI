@@ -58,14 +58,25 @@ pub struct PressureConfig {
 
 impl Default for PressureConfig {
     fn default() -> Self {
-        Self { l2_capacity: 10_000, pressure_curve: 2.0 }
+        Self {
+            l2_capacity: 10_000,
+            pressure_curve: 2.0,
+        }
     }
 }
 
 /// Compute memory pressure from tier utilization. Returns 0.0–1.0.
 pub fn calculate_pressure(l1_size: usize, l1_max: usize, l2_size: usize, l2_cap: usize) -> f32 {
-    let l1_u = if l1_max > 0 { l1_size as f32 / l1_max as f32 } else { 0.0 };
-    let l2_u = if l2_cap > 0 { l2_size as f32 / l2_cap as f32 } else { 0.0 };
+    let l1_u = if l1_max > 0 {
+        l1_size as f32 / l1_max as f32
+    } else {
+        0.0
+    };
+    let l2_u = if l2_cap > 0 {
+        l2_size as f32 / l2_cap as f32
+    } else {
+        0.0
+    };
     l1_u.max(l2_u).min(1.0)
 }
 
@@ -86,7 +97,11 @@ pub struct SloTracker {
 }
 
 impl SloTracker {
-    pub fn new(thresholds: SloThresholds, pressure: PressureConfig, base_half_life_ms: i64) -> Self {
+    pub fn new(
+        thresholds: SloThresholds,
+        pressure: PressureConfig,
+        base_half_life_ms: i64,
+    ) -> Self {
         Self {
             thresholds,
             pressure_config: pressure,
@@ -99,7 +114,8 @@ impl SloTracker {
 
     /// Update pressure from current tier sizes.
     pub fn update_pressure(&mut self, l1_size: usize, l1_max: usize, l2_size: usize) {
-        self.current_pressure = calculate_pressure(l1_size, l1_max, l2_size, self.pressure_config.l2_capacity);
+        self.current_pressure =
+            calculate_pressure(l1_size, l1_max, l2_size, self.pressure_config.l2_capacity);
     }
 
     /// Record a query sample and return current SLO report.
@@ -127,15 +143,26 @@ impl SloTracker {
         }
 
         let total = self.samples.len();
-        let rate = if total > 0 { violation_count as f32 / total as f32 } else { 0.0 };
-        let budget = if self.thresholds.max_violation_rate > 0.0 {
-            ((self.thresholds.max_violation_rate - rate) / self.thresholds.max_violation_rate).max(0.0)
+        let rate = if total > 0 {
+            violation_count as f32 / total as f32
         } else {
-            if violation_count > 0 { 0.0 } else { 1.0 }
+            0.0
+        };
+        let budget = if self.thresholds.max_violation_rate > 0.0 {
+            ((self.thresholds.max_violation_rate - rate) / self.thresholds.max_violation_rate)
+                .max(0.0)
+        } else {
+            if violation_count > 0 {
+                0.0
+            } else {
+                1.0
+            }
         };
 
         let adj = pressure_adjusted_half_life(
-            self.base_half_life_ms, self.current_pressure, self.pressure_config.pressure_curve,
+            self.base_half_life_ms,
+            self.current_pressure,
+            self.pressure_config.pressure_curve,
         );
 
         SloReport {
@@ -148,6 +175,11 @@ impl SloTracker {
             pressure: self.current_pressure,
             adjusted_half_life_ms: adj,
         }
+    }
+
+    /// Whether the circuit breaker is currently open.
+    pub fn circuit_open(&self) -> bool {
+        self.circuit_open
     }
 
     /// Manually reset the circuit breaker.

@@ -3,9 +3,9 @@
  * Immutable block creation and validation
  */
 
-import type { Block, BlockMetadata, MemoryOperation } from './types';
-import { computeBlockHash, hashContent } from './hash';
-import { now } from '../../lib/utils/time';
+import type { Block, BlockMetadata, MemoryOperation } from './types.js';
+import { computeBlockHash, hashContent } from './hash.js';
+import { now } from '../../lib/utils/time.js';
 
 /** Genesis block previous hash marker */
 export const GENESIS_HASH = 'GENESIS';

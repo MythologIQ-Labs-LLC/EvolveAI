@@ -6,11 +6,10 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  TransformerEngine,
   createTransformerEngine,
   DEFAULT_TRANSFORMER_CONFIG
-} from '../../core/representation/transformer-engine';
-import { createRepresentation, extractVector } from '../../core/representation/types';
+} from '../../core/representation/transformer-engine.js';
+import { createRepresentation, extractVector } from '../../core/representation/types.js';
 
 describe('TransformerEngine', () => {
   describe('Configuration', () => {

@@ -3,8 +3,8 @@
  * Tracks operations during Active Flow phase
  */
 
-import type { PipelineTrace, Phase } from './types';
-import { now } from '../../lib/utils/time';
+import type { PipelineTrace, Phase } from './types.js';
+import { now } from '../../lib/utils/time.js';
 
 /**
  * Generate a unique trace ID

@@ -3,10 +3,10 @@
  * Decay-weighted semantic relationships
  */
 
-import type { GraphEdge, EdgeType } from './types';
-import { now } from '../../lib/utils/time';
-import { sha256 } from '../../lib/utils/hash';
-import { computeDecay } from '../memory/decay';
+import type { GraphEdge, EdgeType } from './types.js';
+import { now } from '../../lib/utils/time.js';
+import { sha256 } from '../../lib/utils/hash.js';
+import { computeDecay } from '../memory/decay.js';
 
 /** Default edge decay rate */
 const DEFAULT_EDGE_LAMBDA = 0.01;

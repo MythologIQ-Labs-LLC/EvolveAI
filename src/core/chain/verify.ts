@@ -3,9 +3,9 @@
  * Validates hash chain consistency and content integrity
  */
 
-import type { Block, IntegrityReport, VerificationResult } from './types';
-import { validateBlockHash, validateChainLink, GENESIS_HASH } from './block';
-import { hashContent } from './hash';
+import type { Block, IntegrityReport, VerificationResult } from './types.js';
+import { validateBlockHash, validateChainLink, GENESIS_HASH } from './block.js';
+import { hashContent } from './hash.js';
 
 /**
  * Validate a single block's internal integrity

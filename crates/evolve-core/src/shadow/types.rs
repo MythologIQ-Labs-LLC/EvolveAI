@@ -30,8 +30,10 @@ impl FailureCategory {
         match self {
             Self::SecurityRegression => Severity::Critical,
             Self::Hallucination | Self::IntegrationFailure | Self::TestFailure => Severity::High,
-            Self::ComplexityViolation | Self::ScopeCreep
-            | Self::ResourceExhaustion | Self::ValidationError => Severity::Medium,
+            Self::ComplexityViolation
+            | Self::ScopeCreep
+            | Self::ResourceExhaustion
+            | Self::ValidationError => Severity::Medium,
             Self::PrematureOptimization | Self::TechnicalDebt => Severity::Low,
         }
     }

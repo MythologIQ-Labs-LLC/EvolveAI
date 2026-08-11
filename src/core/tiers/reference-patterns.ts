@@ -3,8 +3,8 @@
  * Pattern definitions for semantic MTS assessment
  */
 
-import type { RepresentationEngine } from '../representation/engine';
-import type { Representation } from '../representation/types';
+import type { RepresentationEngine } from '../representation/engine.js';
+import type { Representation } from '../representation/types.js';
 
 /**
  * Raw text patterns for each assessment dimension

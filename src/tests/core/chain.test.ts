@@ -3,10 +3,10 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { HashChainLedger, createLedger } from '../../core/chain/ledger';
-import { createBlock, createGenesisBlock, GENESIS_HASH } from '../../core/chain/block';
-import { validateChain, verifyContent } from '../../core/chain/verify';
-import { hashContent, generateUorId } from '../../core/chain/hash';
+import { HashChainLedger, createLedger } from '../../core/chain/ledger.js';
+import { createBlock, createGenesisBlock, GENESIS_HASH } from '../../core/chain/block.js';
+import { validateChain, verifyContent } from '../../core/chain/verify.js';
+import { hashContent } from '../../core/chain/hash.js';
 
 describe('Hash Chain', () => {
   describe('hashContent', () => {

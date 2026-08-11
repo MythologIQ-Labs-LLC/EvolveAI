@@ -11,7 +11,7 @@ import {
   cosineSimilarity,
   euclideanDistance,
   dotProduct
-} from '../../core/representation';
+} from '../../core/representation/index.js';
 
 describe('MockEngine', () => {
   it('creates valid representation with correct modelId', async () => {

@@ -13,7 +13,9 @@ fn make_trace(intent: &str, category: FailureCategory) -> FailureTrace {
 }
 
 fn make_embedding(seed: f32, dim: usize) -> Vec<f32> {
-    (0..dim).map(|i| ((seed * (i as f32 + 1.0)).sin() * 0.5)).collect()
+    (0..dim)
+        .map(|i| ((seed * (i as f32 + 1.0)).sin() * 0.5))
+        .collect()
 }
 
 // === Genome Tests ===
@@ -96,10 +98,22 @@ fn test_prune_at_capacity() {
     let config = ShadowGenomeConfig { max_entries: 2 };
     let mut genome = ShadowGenome::new(config);
 
-    genome.ingest(make_trace("old", FailureCategory::TechnicalDebt), make_embedding(1.0, 8), 100);
-    genome.ingest(make_trace("mid", FailureCategory::ScopeCreep), make_embedding(2.0, 8), 200);
+    genome.ingest(
+        make_trace("old", FailureCategory::TechnicalDebt),
+        make_embedding(1.0, 8),
+        100,
+    );
+    genome.ingest(
+        make_trace("mid", FailureCategory::ScopeCreep),
+        make_embedding(2.0, 8),
+        200,
+    );
     // This should prune the oldest low-trigger entry
-    genome.ingest(make_trace("new", FailureCategory::Hallucination), make_embedding(3.0, 8), 300);
+    genome.ingest(
+        make_trace("new", FailureCategory::Hallucination),
+        make_embedding(3.0, 8),
+        300,
+    );
 
     assert_eq!(genome.len(), 2);
 }
@@ -131,7 +145,10 @@ fn test_check_blocks_similar_intent() {
     );
 
     // Identical embedding — should match
-    let config = InterceptorConfig { safety_threshold: 0.9, ..Default::default() };
+    let config = InterceptorConfig {
+        safety_threshold: 0.9,
+        ..Default::default()
+    };
     let verdict = interceptor::check_intent(&[1.0, 0.0, 0.0], &mut genome, &config);
     assert!(matches!(verdict, Verdict::Block { .. }));
 }
@@ -158,7 +175,10 @@ fn test_check_records_triggers() {
     let trace = make_trace("repeat offender", FailureCategory::ScopeCreep);
     let id = genome.ingest(trace, vec![1.0, 0.0], 1000).id.clone();
 
-    let config = InterceptorConfig { safety_threshold: 0.9, ..Default::default() };
+    let config = InterceptorConfig {
+        safety_threshold: 0.9,
+        ..Default::default()
+    };
     interceptor::check_intent(&[1.0, 0.0], &mut genome, &config);
 
     let entries = genome.active_entries();

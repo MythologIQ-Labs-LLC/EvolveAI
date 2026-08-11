@@ -6,10 +6,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   LifecycleOrchestrator,
   createOrchestrator
-} from '../../core/lifecycle/orchestrator';
-import { createInitialState, DEFAULT_LIFECYCLE_CONFIG } from '../../core/lifecycle/types';
-import { createTrace, completeTrace, failTrace, getTraceStats } from '../../core/lifecycle/trace';
-import { createMixedTraces } from '../fixtures/traces';
+} from '../../core/lifecycle/orchestrator.js';
+import { createInitialState } from '../../core/lifecycle/types.js';
+import { createTrace, completeTrace, failTrace, getTraceStats } from '../../core/lifecycle/trace.js';
+import { createMixedTraces } from '../fixtures/traces.js';
 
 describe('Lifecycle Orchestrator', () => {
   let orchestrator: LifecycleOrchestrator;
