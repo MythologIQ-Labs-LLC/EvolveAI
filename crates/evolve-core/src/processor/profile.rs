@@ -91,7 +91,7 @@ fn compute_top_tags(units: &[&MemoryUnit], max: usize) -> Vec<(String, usize)> {
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
         .collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|entry| std::cmp::Reverse(entry.1));
     sorted.truncate(max);
     sorted
 }
