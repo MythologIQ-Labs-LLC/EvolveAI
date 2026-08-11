@@ -1,17 +1,15 @@
-use std::sync::Mutex;
 use crate::lifecycle::orchestrator::{LifecycleError, Orchestrator};
 use crate::lifecycle::types::Phase;
 use crate::memory::encoder;
 use crate::memory::types::*;
-use crate::processor::persist;
-use crate::processor::query as query_mod;
 use crate::processor::ingest;
+use crate::processor::persist;
 use crate::processor::profile::{self, CognitiveProfile};
+use crate::processor::query as query_mod;
 use crate::processor::slo::{SloReport, SloSample, SloTracker};
 use crate::processor::trust;
 use crate::processor::types::{
-    EncodeResult, PersistError, ProcessorConfig, ProcessorStats,
-    QueryResult, Snapshot,
+    EncodeResult, PersistError, ProcessorConfig, ProcessorStats, QueryResult, Snapshot,
 };
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::shadow::genome::ShadowGenome;
@@ -20,6 +18,7 @@ use crate::shadow::types::FailureTrace;
 use crate::tiers::l1_cache::L1Cache;
 use crate::tiers::l2_graph::L2Graph;
 use crate::tiers::l3_vault::L3Vault;
+use std::sync::Mutex;
 
 /// Central facade for the autopoietic memory system.
 pub struct MemoryProcessor<E: RepresentationEngine> {
@@ -37,10 +36,8 @@ pub struct MemoryProcessor<E: RepresentationEngine> {
 impl<E: RepresentationEngine> MemoryProcessor<E> {
     /// Create a new processor with the given engine and config.
     pub fn new(engine: E, config: ProcessorConfig) -> Self {
-        let lifecycle = Orchestrator::new(
-            uuid::Uuid::new_v4().to_string(),
-            config.lifecycle.clone(),
-        );
+        let lifecycle =
+            Orchestrator::new(uuid::Uuid::new_v4().to_string(), config.lifecycle.clone());
         Self {
             l1: L1Cache::new(config.l1_ttl_ms, config.l1_max_size),
             l2: L2Graph::new(),
@@ -48,7 +45,11 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             shadow: ShadowGenome::default(),
             lifecycle,
             engine,
-            slo_tracker: Mutex::new(SloTracker::new(config.slo.clone(), config.pressure.clone(), config.decoder.half_life_ms)),
+            slo_tracker: Mutex::new(SloTracker::new(
+                config.slo.clone(),
+                config.pressure.clone(),
+                config.decoder.half_life_ms,
+            )),
             config,
             session_log: Vec::new(),
         }
@@ -78,7 +79,8 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
             Tier::L1 => self.l1.insert(unit.clone(), now),
             Tier::L2 => {
                 self.l2.insert(unit.clone());
-                self.l2.link_to_session(&unit.address, &self.session_log, now);
+                self.l2
+                    .link_to_session(&unit.address, &self.session_log, now);
                 self.pin_session_peers(&unit.address, now);
                 self.session_log.push((unit.address.clone(), now));
             }
@@ -89,11 +91,7 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     }
 
     /// Query across tiers and return scored results.
-    pub async fn query(
-        &self,
-        query: &Query,
-        now: i64,
-    ) -> Result<QueryResult, EngineError> {
+    pub async fn query(&self, query: &Query, now: i64) -> Result<QueryResult, EngineError> {
         let start = std::time::Instant::now();
 
         let allows_l3 = matches!(query.constraints.require_tier, None | Some(Tier::L3));
@@ -164,7 +162,11 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     pub async fn check_safety(&mut self, intent: &str) -> Result<Verdict, EngineError> {
         let rep = self.engine.encode(intent).await?;
         let embedding = rep.as_vector();
-        Ok(interceptor::check_intent(&embedding, &mut self.shadow, &self.config.interceptor))
+        Ok(interceptor::check_intent(
+            &embedding,
+            &mut self.shadow,
+            &self.config.interceptor,
+        ))
     }
 
     pub async fn record_failure(
@@ -183,14 +185,18 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
 
     pub fn record_access(&mut self, addr: &UorAddress, event: PinningEvent) -> bool {
         trust::record_access(
-            &mut self.l2, &mut self.l3, addr, event,
+            &mut self.l2,
+            &mut self.l3,
+            addr,
+            event,
             self.config.crystallization,
         )
     }
 
     /// List L2 memories with σ≥0.95 awaiting crystallization approval.
     pub fn pending_crystallizations(&self) -> Vec<UorAddress> {
-        self.l2.iter_units()
+        self.l2
+            .iter_units()
             .filter(|u| u.saturation >= 0.95)
             .map(|u| u.address.clone())
             .collect()
@@ -225,7 +231,10 @@ impl<E: RepresentationEngine> MemoryProcessor<E> {
     }
 
     pub async fn ingest_file(
-        &mut self, path: &std::path::Path, tags: Vec<String>, now: i64,
+        &mut self,
+        path: &std::path::Path,
+        tags: Vec<String>,
+        now: i64,
     ) -> Result<ingest::IngestResult, ingest::IngestError> {
         ingest::ingest_file(self, path, tags, &ingest::ChunkConfig::default(), now).await
     }

@@ -30,7 +30,9 @@ impl CognitiveProfile {
             format!("Crystallized: {} (σ ≥ 0.95)", self.crystallized_count),
         ];
         if !self.top_tags.is_empty() {
-            let tags: Vec<String> = self.top_tags.iter()
+            let tags: Vec<String> = self
+                .top_tags
+                .iter()
                 .map(|(t, c)| format!("{t} ({c})"))
                 .collect();
             lines.push(format!("Top tags: {}", tags.join(", ")));
@@ -53,8 +55,12 @@ pub fn compute(
 
     let total = l1_units.len() + l2_units.len() + l3_units.len();
 
-    let all: Vec<&MemoryUnit> = l1_units.iter().chain(l2_units.iter()).chain(l3_units.iter())
-        .copied().collect();
+    let all: Vec<&MemoryUnit> = l1_units
+        .iter()
+        .chain(l2_units.iter())
+        .chain(l3_units.iter())
+        .copied()
+        .collect();
 
     let avg_sat = if total > 0 {
         all.iter().map(|u| u.saturation).sum::<f32>() / total as f32
@@ -81,7 +87,8 @@ fn compute_top_tags(units: &[&MemoryUnit], max: usize) -> Vec<(String, usize)> {
             *counts.entry(tag.as_str()).or_default() += 1;
         }
     }
-    let mut sorted: Vec<(String, usize)> = counts.into_iter()
+    let mut sorted: Vec<(String, usize)> = counts
+        .into_iter()
         .map(|(k, v)| (k.to_string(), v))
         .collect();
     sorted.sort_by(|a, b| b.1.cmp(&a.1));

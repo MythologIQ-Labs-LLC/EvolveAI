@@ -79,8 +79,14 @@ impl L3Vault {
 
     /// Reconstruct from parts (entries + ledger).
     pub fn from_parts(entries: Vec<MemoryUnit>, ledger: Ledger) -> Self {
-        let entry_map = entries.into_iter().map(|u| (u.address.clone(), u)).collect();
-        Self { entries: entry_map, ledger }
+        let entry_map = entries
+            .into_iter()
+            .map(|u| (u.address.clone(), u))
+            .collect();
+        Self {
+            entries: entry_map,
+            ledger,
+        }
     }
 }
 

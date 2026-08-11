@@ -1,7 +1,6 @@
 use crate::memory::types::{
-    ContentType, InputMetadata, PinningEvent, Priority,
-    Query, QueryConstraints, RawInput, ScoredMemory,
-    Sensitivity, TrustLevel, UorAddress,
+    ContentType, InputMetadata, PinningEvent, Priority, Query, QueryConstraints, RawInput,
+    ScoredMemory, Sensitivity, TrustLevel, UorAddress,
 };
 use crate::processor::facade::MemoryProcessor;
 use crate::processor::types::ProcessorConfig;
@@ -168,13 +167,19 @@ impl SimpleMemory {
     }
 
     /// Save state to a JSON file.
-    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), crate::processor::types::PersistError> {
+    pub fn save_to_file(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<(), crate::processor::types::PersistError> {
         let now = chrono::Utc::now().timestamp_millis();
         self.processor.save_to_file(path, now)
     }
 
     /// Load state from a JSON file.
-    pub fn load_from_file(&mut self, path: &std::path::Path) -> Result<(), crate::processor::types::PersistError> {
+    pub fn load_from_file(
+        &mut self,
+        path: &std::path::Path,
+    ) -> Result<(), crate::processor::types::PersistError> {
         self.processor.load_from_file(path)
     }
 }

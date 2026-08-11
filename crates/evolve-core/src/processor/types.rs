@@ -1,4 +1,5 @@
 use crate::chain::block::Block;
+use crate::lifecycle::orchestrator::LifecycleConfig;
 use crate::memory::decoder::DecoderConfig;
 use crate::memory::encoder::EncoderConfig;
 use crate::memory::types::{MemoryUnit, RecallResult, Tier, UorAddress};
@@ -8,7 +9,6 @@ use crate::shadow::interceptor::InterceptorConfig;
 use crate::shadow::types::ShadowEntry;
 use crate::tiers::l2_graph::Edge;
 use crate::tiers::router::RouteDecision;
-use crate::lifecycle::orchestrator::LifecycleConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

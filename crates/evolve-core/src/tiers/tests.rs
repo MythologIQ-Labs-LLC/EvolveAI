@@ -21,22 +21,14 @@ fn make_unit(content: &str, tags: Vec<&str>, embedding_len: usize) -> MemoryUnit
 #[test]
 fn test_route_sensitive_to_l3() {
     let unit = make_unit("sensitive-data", vec!["sensitive"], 384);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L3);
 }
 
 #[test]
 fn test_route_standard_to_l2() {
     let unit = make_unit("normal-data", vec![], 384);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L2);
 }
 
@@ -44,22 +36,14 @@ fn test_route_standard_to_l2() {
 fn test_route_with_custom_thresholds() {
     let unit = make_unit("small-data", vec![], 10);
     let thresholds = TierThresholds { l3: 0.9, l2: 0.5 };
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &thresholds,
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &thresholds);
     assert_eq!(decision.tier, Tier::L1);
 }
 
 #[test]
 fn test_mts_score_calculation() {
     let unit = make_unit("scored-data", vec!["sensitive"], 1000);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     // sensitivity=1.0*0.4 + accuracy=0.5*0.3 + privilege=1.0*0.2 + compute=1.0*0.1
     // = 0.4 + 0.15 + 0.2 + 0.1 = 0.85
     assert!(decision.mts_score > 0.84);
@@ -70,11 +54,7 @@ fn test_mts_score_calculation() {
 fn test_crystallized_memory_routes_to_l3() {
     let mut unit = make_unit("crystallized", vec![], 32);
     unit.saturation = 0.96;
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L3);
 }
 
@@ -240,7 +220,7 @@ fn test_link_to_session_weight_decreases_with_gap() {
     graph.link_to_session(&a3, &session, 10000);
 
     let close_edge = &graph.edges_from(&a3)[0]; // a1 is first in session
-    let far_edge = &graph.edges_from(&a3)[1];   // a2 is second
+    let far_edge = &graph.edges_from(&a3)[1]; // a2 is second
     assert!(close_edge.weight > far_edge.weight);
 }
 

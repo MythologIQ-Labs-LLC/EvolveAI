@@ -22,7 +22,10 @@ pub struct ShadowGenome {
 
 impl ShadowGenome {
     pub fn new(config: ShadowGenomeConfig) -> Self {
-        Self { entries: HashMap::new(), config }
+        Self {
+            entries: HashMap::new(),
+            config,
+        }
     }
 
     /// Deterministic ID from trace content.
@@ -34,12 +37,7 @@ impl ShadowGenome {
     /// Ingest a failure trace with its embedding.
     /// Deduplicates by ID — repeated ingestion increments trigger_count.
     /// Returns a clone of the stored entry.
-    pub fn ingest(
-        &mut self,
-        trace: FailureTrace,
-        embedding: Vec<f32>,
-        now: i64,
-    ) -> ShadowEntry {
+    pub fn ingest(&mut self, trace: FailureTrace, embedding: Vec<f32>, now: i64) -> ShadowEntry {
         let id = Self::generate_id(&trace);
 
         if let Some(existing) = self.entries.get_mut(&id) {
@@ -80,7 +78,10 @@ impl ShadowGenome {
     /// Deactivate an entry (soft delete).
     pub fn deactivate(&mut self, id: &str) -> bool {
         match self.entries.get_mut(id) {
-            Some(e) => { e.active = false; true }
+            Some(e) => {
+                e.active = false;
+                true
+            }
             None => false,
         }
     }
@@ -110,7 +111,9 @@ impl ShadowGenome {
 
     /// Remove the least valuable entry (lowest trigger count, oldest).
     fn prune_least_valuable(&mut self) {
-        let target = self.entries.iter()
+        let target = self
+            .entries
+            .iter()
             .filter(|(_, e)| e.trigger_count <= 1)
             .min_by_key(|(_, e)| e.created_at)
             .map(|(id, _)| id.clone());

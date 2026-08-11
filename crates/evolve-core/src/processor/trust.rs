@@ -66,11 +66,7 @@ pub fn record_conflict(
 
 /// Explicitly approve crystallization (L2->L3 promotion).
 /// Succeeds only if the unit exists in L2 with saturation >= 0.95.
-pub fn approve_crystallization(
-    l2: &mut L2Graph,
-    l3: &mut L3Vault,
-    addr: &UorAddress,
-) -> bool {
+pub fn approve_crystallization(l2: &mut L2Graph, l3: &mut L3Vault, addr: &UorAddress) -> bool {
     let dominated = l2
         .get_mut(addr)
         .map(|u| u.saturation >= CRYSTALLIZATION_THRESHOLD)
@@ -85,16 +81,11 @@ pub fn approve_crystallization(
 }
 
 /// Pin session peers via `CrossReference` events.
-pub fn pin_session_peers(
-    l2: &mut L2Graph,
-    session_log: &[(UorAddress, i64)],
-) {
+pub fn pin_session_peers(l2: &mut L2Graph, session_log: &[(UorAddress, i64)]) {
     for (peer_addr, _) in session_log {
         if let Some(unit) = l2.get_mut(peer_addr) {
-            unit.saturation = decay::boost_saturation_weighted(
-                unit.saturation,
-                PinningEvent::CrossReference,
-            );
+            unit.saturation =
+                decay::boost_saturation_weighted(unit.saturation, PinningEvent::CrossReference);
         }
     }
 }

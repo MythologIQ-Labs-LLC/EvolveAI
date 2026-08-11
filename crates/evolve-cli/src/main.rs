@@ -166,9 +166,7 @@ fn cmd_dispute(args: &[String]) {
         eprintln!("error: dispute requires an address");
         std::process::exit(1);
     }
-    let severity: f32 = args.get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0.5);
+    let severity: f32 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.5);
     let mut mem = load_memory();
     let addr = UorAddress(args[0].clone());
     match mem.dispute(&addr, severity) {
@@ -211,9 +209,16 @@ fn cmd_slo() {
     println!("Budget remaining: {:.2}", report.budget_remaining);
     println!(
         "Circuit:          {}",
-        if report.circuit_open { "OPEN" } else { "closed" }
+        if report.circuit_open {
+            "OPEN"
+        } else {
+            "closed"
+        }
     );
-    println!("Violations:       {}/{}", report.violation_count, report.total_samples);
+    println!(
+        "Violations:       {}/{}",
+        report.violation_count, report.total_samples
+    );
     println!("Half-life (adj):  {} ms", report.adjusted_half_life_ms);
 }
 
