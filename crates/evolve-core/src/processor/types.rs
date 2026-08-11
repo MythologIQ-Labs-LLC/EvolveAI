@@ -80,7 +80,9 @@ impl Default for ProcessorConfig {
             l1_max_size: 1000,
             slo: SloThresholds::default(),
             pressure: PressureConfig::default(),
-            crystallization: CrystallizationPolicy::Auto,
+            // ADR-020: learned signals propose, never self-authorize.
+            // σ ≥ 0.95 nominates a unit; `approve_crystallization` commits.
+            crystallization: CrystallizationPolicy::RequireApproval,
         }
     }
 }

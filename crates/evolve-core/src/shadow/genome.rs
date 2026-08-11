@@ -14,6 +14,20 @@ impl Default for ShadowGenomeConfig {
     }
 }
 
+/// Aggregate view of the genome for display surfaces (CLI/Tauri frontends).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ShadowStats {
+    /// All entries, active and deactivated.
+    pub total_entries: usize,
+    /// Entries currently active (matchable by the interceptor).
+    pub active_entries: usize,
+    /// Sum of trigger counts across all entries.
+    pub total_triggers: u64,
+    /// Entry counts per failure category, most frequent first
+    /// (ties broken by category name for determinism).
+    pub by_category: Vec<(FailureCategory, usize)>,
+}
+
 /// Shadow Genome — negative-constraint store tracking failure patterns.
 pub struct ShadowGenome {
     entries: HashMap<String, ShadowEntry>,
@@ -94,6 +108,31 @@ impl ShadowGenome {
     /// Whether the genome is empty.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Aggregate statistics over the genome.
+    pub fn stats(&self) -> ShadowStats {
+        let mut counts: HashMap<FailureCategory, usize> = HashMap::new();
+        let mut total_triggers = 0u64;
+        let mut active_entries = 0usize;
+        for entry in self.entries.values() {
+            *counts.entry(entry.category).or_default() += 1;
+            total_triggers += u64::from(entry.trigger_count);
+            if entry.active {
+                active_entries += 1;
+            }
+        }
+        let mut by_category: Vec<(FailureCategory, usize)> = counts.into_iter().collect();
+        by_category.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| format!("{:?}", a.0).cmp(&format!("{:?}", b.0)))
+        });
+        ShadowStats {
+            total_entries: self.entries.len(),
+            active_entries,
+            total_triggers,
+            by_category,
+        }
     }
 
     /// Export all entries for persistence.

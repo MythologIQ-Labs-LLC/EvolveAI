@@ -16,7 +16,8 @@ pub enum CrystallizationPolicy {
     RequireApproval,
 }
 
-const CRYSTALLIZATION_THRESHOLD: f32 = 0.95;
+/// Saturation level at which a unit becomes a crystallization candidate.
+pub const CRYSTALLIZATION_THRESHOLD: f32 = 0.95;
 
 /// Record a pinning event, boosting saturation.
 /// Auto-promotes L2->L3 only if `policy == Auto` and saturation >= 0.95.

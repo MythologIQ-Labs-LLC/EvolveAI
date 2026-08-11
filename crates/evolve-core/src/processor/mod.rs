@@ -1,5 +1,6 @@
 pub mod facade;
 pub mod ingest;
+pub mod metabolism;
 pub mod persist;
 pub mod profile;
 pub mod query;

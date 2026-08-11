@@ -592,11 +592,20 @@ async fn test_clear_session_resets() {
 }
 
 // --- Tier promotion tests (v5.2) ---
+// These test Auto-policy promotion behavior, so they construct the Auto
+// policy explicitly (the default is RequireApproval per ADR-020).
+
+fn auto_config() -> ProcessorConfig {
+    ProcessorConfig {
+        crystallization: CrystallizationPolicy::Auto,
+        ..Default::default()
+    }
+}
 
 #[tokio::test]
 async fn test_promotion_l2_to_l3_on_crystallization() {
     let engine = MockEngine::new(384);
-    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let mut proc = MemoryProcessor::new(engine, auto_config());
 
     let result = proc
         .encode(&make_input("promote me", vec![]), 1000)
@@ -620,7 +629,7 @@ async fn test_promotion_l2_to_l3_on_crystallization() {
 #[tokio::test]
 async fn test_promoted_memory_queryable_by_address() {
     let engine = MockEngine::new(384);
-    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let mut proc = MemoryProcessor::new(engine, auto_config());
 
     proc.encode(&make_input("will promote", vec![]), 1000)
         .await
@@ -641,7 +650,7 @@ async fn test_promoted_memory_queryable_by_address() {
 #[tokio::test]
 async fn test_promotion_removes_from_l2() {
     let engine = MockEngine::new(384);
-    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let mut proc = MemoryProcessor::new(engine, auto_config());
 
     proc.encode(&make_input("stays", vec![]), 1000)
         .await
@@ -1146,9 +1155,18 @@ async fn test_auto_policy_still_works() {
 }
 
 #[test]
-fn test_default_policy_is_auto_for_compat() {
+fn test_default_policy_requires_approval() {
+    // ADR-020: learned signals propose, never self-authorize. The default
+    // must match CrystallizationPolicy's own documented default.
     let config = ProcessorConfig::default();
-    assert_eq!(config.crystallization, CrystallizationPolicy::Auto);
+    assert_eq!(
+        config.crystallization,
+        CrystallizationPolicy::RequireApproval
+    );
+    assert_eq!(
+        CrystallizationPolicy::default(),
+        CrystallizationPolicy::RequireApproval
+    );
 }
 
 // --- Source provenance tests (v5.7) ---
@@ -1518,4 +1536,491 @@ async fn test_save_to_file_fsyncs_and_roundtrips() {
 
     std::fs::remove_file(&path).ok();
     std::fs::remove_dir(&dir).ok();
+}
+
+// --- Lifecycle wiring tests (v6.3: orchestrator driven by the facade) ---
+
+use crate::lifecycle::types::Phase;
+use crate::representation::engine::{EngineError, RepresentationEngine};
+use crate::representation::types::{
+    CrossModelResult, EngineCapabilities, Representation, SimilarityStrategy,
+};
+use crate::shadow::types::FailureCategory;
+
+#[tokio::test]
+async fn test_encode_enters_active_flow_and_records_trace() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert_eq!(proc.phase(), Phase::Idle);
+
+    proc.encode(&make_input("first op", vec![]), 1000)
+        .await
+        .unwrap();
+    let stats = proc.stats();
+    assert_eq!(stats.phase, Phase::ActiveFlow);
+    assert_eq!(stats.trace_count, 1);
+}
+
+#[tokio::test]
+async fn test_query_records_operation_trace() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("queryable", vec![]), 1000)
+        .await
+        .unwrap();
+    proc.query(&make_query("queryable"), 1001).await.unwrap();
+    let stats = proc.stats();
+    assert_eq!(stats.phase, Phase::ActiveFlow);
+    assert_eq!(stats.trace_count, 2);
+}
+
+#[tokio::test]
+async fn test_detach_below_threshold_returns_to_idle_without_synthesis() {
+    let engine = MockEngine::new(384);
+    // Default synthesis_threshold is 10; one trace stays below it.
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("one op", vec![]), 1000)
+        .await
+        .unwrap();
+
+    let report = proc.detach(1001).unwrap();
+    assert!(!report.synthesized);
+    assert_eq!(report.traces_processed, 0);
+    assert!(report.decay.is_none());
+    assert_eq!(proc.phase(), Phase::Idle);
+}
+
+#[tokio::test]
+async fn test_detach_runs_rem_synthesis_and_decay_sweep() {
+    let mut config = ProcessorConfig::default();
+    config.lifecycle.synthesis_threshold = 2;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    proc.encode(&make_input("trace one", vec![]), 1000)
+        .await
+        .unwrap();
+    proc.encode(&make_input("trace two", vec![]), 1001)
+        .await
+        .unwrap();
+    assert_eq!(proc.stats().trace_count, 2);
+
+    // Detach far in the future: synthesis runs and the decay sweep prunes
+    // the fully-decayed unpinned units.
+    let far_future = 1000 + 40_000_000;
+    let report = proc.detach(far_future).unwrap();
+    assert!(report.synthesized);
+    assert_eq!(report.traces_processed, 2);
+    let decay = report.decay.unwrap();
+    assert_eq!(decay.l2_examined, 2);
+    assert!(
+        decay.l2_pruned > 0,
+        "REM synthesis must run the decay sweep"
+    );
+    assert_eq!(proc.phase(), Phase::Idle);
+    assert_eq!(proc.stats().trace_count, 0);
+}
+
+#[tokio::test]
+async fn test_detach_from_idle_is_invalid_phase() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert!(proc.detach(1000).is_err());
+}
+
+#[tokio::test]
+async fn test_budget_exhaustion_keeps_system_idle() {
+    let mut config = ProcessorConfig::default();
+    config.lifecycle.default_ops_budget = 1;
+    config.lifecycle.default_time_budget_ms = 60_000;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    proc.start_session(1000).unwrap();
+    proc.encode(&make_input("only op", vec![]), 1001)
+        .await
+        .unwrap();
+    assert_eq!(proc.phase(), Phase::ActiveFlow);
+    assert_eq!(proc.stats().trace_count, 1);
+
+    proc.detach(1002).unwrap();
+    assert_eq!(proc.phase(), Phase::Idle);
+
+    // Budget is exhausted: further operations must not re-enter ActiveFlow
+    // and must not record traces.
+    proc.encode(&make_input("over budget", vec![]), 1003)
+        .await
+        .unwrap();
+    assert_eq!(proc.phase(), Phase::Idle);
+    assert_eq!(proc.stats().trace_count, 1);
+}
+
+// --- Shadow genome wiring tests (v6.3: real failures feed the genome) ---
+
+/// Engine that refuses to encode content containing "!!fail".
+struct FlakyEngine {
+    inner: MockEngine,
+}
+
+impl FlakyEngine {
+    fn new(dimensions: usize) -> Self {
+        Self {
+            inner: MockEngine::new(dimensions),
+        }
+    }
+}
+
+impl RepresentationEngine for FlakyEngine {
+    fn model_id(&self) -> &str {
+        self.inner.model_id()
+    }
+    fn capabilities(&self) -> &EngineCapabilities {
+        self.inner.capabilities()
+    }
+    async fn encode(&self, content: &str) -> Result<Representation, EngineError> {
+        if content.contains("!!fail") {
+            return Err(EngineError::EncodingFailed(
+                "flaky engine refused content".to_string(),
+            ));
+        }
+        self.inner.encode(content).await
+    }
+    async fn encode_batch(&self, contents: &[&str]) -> Result<Vec<Representation>, EngineError> {
+        let mut out = Vec::with_capacity(contents.len());
+        for c in contents {
+            out.push(self.encode(c).await?);
+        }
+        Ok(out)
+    }
+    fn similarity(
+        &self,
+        a: &Representation,
+        b: &Representation,
+        strategy: SimilarityStrategy,
+    ) -> f32 {
+        self.inner.similarity(a, b, strategy)
+    }
+    fn cross_model_similarity(&self, a: &Representation, b: &Representation) -> CrossModelResult {
+        self.inner.cross_model_similarity(a, b)
+    }
+    fn serialize(&self, rep: &Representation) -> Vec<u8> {
+        self.inner.serialize(rep)
+    }
+    fn deserialize(&self, bytes: &[u8]) -> Result<Representation, EngineError> {
+        self.inner.deserialize(bytes)
+    }
+    fn is_native(&self, rep: &Representation) -> bool {
+        self.inner.is_native(rep)
+    }
+}
+
+/// Engine that takes ≥10ms per encode, to violate a 0ms latency SLO.
+struct SlowEngine {
+    inner: MockEngine,
+}
+
+impl RepresentationEngine for SlowEngine {
+    fn model_id(&self) -> &str {
+        self.inner.model_id()
+    }
+    fn capabilities(&self) -> &EngineCapabilities {
+        self.inner.capabilities()
+    }
+    async fn encode(&self, content: &str) -> Result<Representation, EngineError> {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        self.inner.encode(content).await
+    }
+    async fn encode_batch(&self, contents: &[&str]) -> Result<Vec<Representation>, EngineError> {
+        let mut out = Vec::with_capacity(contents.len());
+        for c in contents {
+            out.push(self.encode(c).await?);
+        }
+        Ok(out)
+    }
+    fn similarity(
+        &self,
+        a: &Representation,
+        b: &Representation,
+        strategy: SimilarityStrategy,
+    ) -> f32 {
+        self.inner.similarity(a, b, strategy)
+    }
+    fn cross_model_similarity(&self, a: &Representation, b: &Representation) -> CrossModelResult {
+        self.inner.cross_model_similarity(a, b)
+    }
+    fn serialize(&self, rep: &Representation) -> Vec<u8> {
+        self.inner.serialize(rep)
+    }
+    fn deserialize(&self, bytes: &[u8]) -> Result<Representation, EngineError> {
+        self.inner.deserialize(bytes)
+    }
+    fn is_native(&self, rep: &Representation) -> bool {
+        self.inner.is_native(rep)
+    }
+}
+
+#[tokio::test]
+async fn test_encode_engine_error_feeds_shadow_genome() {
+    let engine = FlakyEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let err = proc
+        .encode(&make_input("!!fail content", vec![]), 1000)
+        .await;
+    assert!(err.is_err());
+
+    let stats = proc.shadow_stats();
+    assert_eq!(stats.total_entries, 1);
+    assert_eq!(stats.active_entries, 1);
+    assert_eq!(stats.by_category[0].0, FailureCategory::IntegrationFailure);
+}
+
+#[tokio::test]
+async fn test_repeated_engine_failures_dedup_and_increment_triggers() {
+    let engine = FlakyEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    for i in 0..3 {
+        let _ = proc
+            .encode(&make_input("!!fail again", vec![]), 1000 + i)
+            .await;
+    }
+    let stats = proc.shadow_stats();
+    assert_eq!(stats.total_entries, 1, "identical failures must dedup");
+    assert_eq!(stats.total_triggers, 3);
+}
+
+#[tokio::test]
+async fn test_check_safety_blocks_after_recorded_engine_failure() {
+    let engine = FlakyEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let _ = proc
+        .encode(&make_input("!!fail content", vec![]), 1000)
+        .await;
+
+    // The failure was recorded under the "memory.encode" intent; a similar
+    // intent must now be blocked by the interceptor.
+    let verdict = proc.check_safety("memory.encode").await.unwrap();
+    assert!(matches!(
+        verdict,
+        crate::shadow::interceptor::Verdict::Block { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_dispute_records_hallucination_and_blocks_similar_intent() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("the moon is made of cheese", vec![]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+
+    assert!(proc.record_conflict(&addr, 0.8).is_some());
+
+    let stats = proc.shadow_stats();
+    assert_eq!(stats.total_entries, 1);
+    assert!(stats
+        .by_category
+        .iter()
+        .any(|(c, n)| *c == FailureCategory::Hallucination && *n == 1));
+
+    // An intent matching the disputed memory's own embedding is blocked.
+    let verdict = proc
+        .check_safety("the moon is made of cheese")
+        .await
+        .unwrap();
+    assert!(matches!(
+        verdict,
+        crate::shadow::interceptor::Verdict::Block { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_dispute_of_unknown_address_records_nothing() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    assert!(proc
+        .record_conflict(&UorAddress::from_content("ghost"), 0.9)
+        .is_none());
+    assert_eq!(proc.shadow_stats().total_entries, 0);
+}
+
+#[tokio::test]
+async fn test_slo_circuit_open_recorded_as_resource_exhaustion() {
+    let mut config = ProcessorConfig::default();
+    config.slo.max_query_latency_ms = 0; // any real latency violates
+    let engine = SlowEngine {
+        inner: MockEngine::new(384),
+    };
+    let proc = MemoryProcessor::new(engine, config);
+
+    proc.query(&make_query("anything"), 1000).await.unwrap();
+    assert!(proc.slo_report().circuit_open);
+
+    let stats = proc.shadow_stats();
+    assert!(stats
+        .by_category
+        .iter()
+        .any(|(c, _)| *c == FailureCategory::ResourceExhaustion));
+
+    // The circuit stays open on the next query — the opening transition is
+    // recorded only once (dedup keeps a single entry regardless).
+    proc.query(&make_query("anything else"), 1001)
+        .await
+        .unwrap();
+    assert_eq!(proc.shadow_stats().total_entries, 1);
+}
+
+// --- Decay tick tests (v6.3: forgetting that actually deletes) ---
+
+#[tokio::test]
+async fn test_decay_tick_evicts_expired_l1() {
+    let mut config = ProcessorConfig::default();
+    config.l1_ttl_ms = 60_000;
+    config.encoder.tier_thresholds.l2 = 1.0; // route everything to L1
+    config.encoder.tier_thresholds.l3 = 1.0;
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, config);
+
+    proc.encode(&make_input("ephemeral note", vec![]), 1000)
+        .await
+        .unwrap();
+    assert_eq!(proc.stats().l1_size, 1);
+
+    let report = proc.run_decay_tick(200_000);
+    assert_eq!(report.l1_examined, 1);
+    assert_eq!(report.l1_evicted, 1);
+    assert_eq!(proc.stats().l1_size, 0);
+}
+
+#[tokio::test]
+async fn test_decay_tick_prunes_unpinned_spares_pinned_and_cleans_edges() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let stale = proc
+        .encode(&make_input("stale fact", vec![]), 1000)
+        .await
+        .unwrap();
+    let pinned = proc
+        .encode(&make_input("pinned fact", vec![]), 1001)
+        .await
+        .unwrap();
+    assert!(proc.stats().l2_edges > 0, "co-capture links the pair");
+
+    // Pin one unit to σ≈0.81 via the weighted pinning hierarchy; the other
+    // stays near σ≈0.05 (one CrossReference from co-capture).
+    for _ in 0..11 {
+        proc.record_access(&pinned.unit.address, PinningEvent::CryptoVerification);
+    }
+
+    // 10 half-lives later: the unpinned unit decays below threshold, the
+    // pinned one is protected by its saturation-slowed decay.
+    let report = proc.run_decay_tick(1000 + 36_000_000);
+    assert_eq!(report.l2_examined, 2);
+    assert_eq!(report.l2_pruned, 1);
+    assert_eq!(report.l2_promoted, 0);
+
+    let stats = proc.stats();
+    assert_eq!(stats.l2_nodes, 1);
+    assert_eq!(stats.l2_edges, 0, "pruning must clean edges");
+    assert_eq!(proc.association_count(&pinned.unit.address), 0);
+    assert!(proc.related(&stale.unit.address).is_empty());
+}
+
+#[tokio::test]
+async fn test_decay_tick_spares_crystallization_candidates() {
+    // Default policy is RequireApproval: a σ≥0.95 unit is a pending
+    // proposal — never pruned, never self-promoted.
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("crystal candidate", vec![]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+    for _ in 0..25 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    let report = proc.run_decay_tick(1000 + 360_000_000);
+    assert_eq!(report.l2_pruned, 0);
+    assert_eq!(report.l2_promoted, 0);
+    assert_eq!(proc.stats().l2_nodes, 1);
+    assert_eq!(proc.stats().l3_size, 0);
+    assert_eq!(proc.pending_crystallizations(), vec![addr]);
+}
+
+#[tokio::test]
+async fn test_decay_tick_promotes_saturated_under_auto_policy() {
+    // Build a σ≥0.95 L2 unit under the guarded policy, then restore that
+    // state into an Auto-policy processor: the tick applies the v5.2
+    // promotion rule.
+    let engine = MockEngine::new(384);
+    let mut guarded = MemoryProcessor::new(engine, ProcessorConfig::default());
+    let result = guarded
+        .encode(&make_input("earned promotion", vec![]), 1000)
+        .await
+        .unwrap();
+    for _ in 0..25 {
+        guarded.record_access(&result.unit.address, PinningEvent::CryptoVerification);
+    }
+    let snap = guarded.snapshot(2000);
+
+    let engine2 = MockEngine::new(384);
+    let mut auto = MemoryProcessor::new(engine2, auto_config());
+    auto.restore(snap).unwrap();
+    assert_eq!(auto.stats().l2_nodes, 1);
+
+    let report = auto.run_decay_tick(3000);
+    assert_eq!(report.l2_promoted, 1);
+    assert_eq!(report.l2_pruned, 0);
+    assert_eq!(auto.stats().l2_nodes, 0);
+    assert_eq!(auto.stats().l3_size, 1);
+}
+
+#[tokio::test]
+async fn test_decay_tick_never_touches_l3() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+    proc.encode(&make_input("vaulted truth", vec!["sensitive"]), 1000)
+        .await
+        .unwrap();
+    assert_eq!(proc.stats().l3_size, 1);
+
+    // Even a fully decayed timeframe leaves L3 intact: vault forgetting
+    // stays explicit (forget/dispute) per zero-trust doctrine.
+    let report = proc.run_decay_tick(1000 + 360_000_000);
+    assert_eq!(report.l3_examined, 1);
+    assert_eq!(proc.stats().l3_size, 1);
+    assert!(proc.health_check());
+}
+
+// --- ADR-020 default-policy gating tests (v6.3) ---
+
+#[tokio::test]
+async fn test_default_config_gates_crystallization() {
+    let engine = MockEngine::new(384);
+    let mut proc = MemoryProcessor::new(engine, ProcessorConfig::default());
+
+    let result = proc
+        .encode(&make_input("proposes not authorizes", vec![]), 1000)
+        .await
+        .unwrap();
+    let addr = result.unit.address.clone();
+    for _ in 0..30 {
+        proc.record_access(&addr, PinningEvent::CryptoVerification);
+    }
+
+    // Saturation alone must not commit the promotion...
+    assert_eq!(proc.stats().l3_size, 0);
+    assert_eq!(proc.pending_crystallizations(), vec![addr.clone()]);
+
+    // ...explicit approval does.
+    assert!(proc.approve_crystallization(&addr));
+    assert_eq!(proc.stats().l3_size, 1);
 }

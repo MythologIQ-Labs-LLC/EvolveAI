@@ -177,6 +177,11 @@ impl SloTracker {
         }
     }
 
+    /// Whether the circuit breaker is currently open.
+    pub fn circuit_open(&self) -> bool {
+        self.circuit_open
+    }
+
     /// Manually reset the circuit breaker.
     pub fn reset_circuit(&mut self) {
         self.circuit_open = false;
