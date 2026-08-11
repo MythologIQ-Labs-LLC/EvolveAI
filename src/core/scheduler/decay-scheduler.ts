@@ -3,17 +3,17 @@
  * Hybrid event-driven + background tick decay management
  */
 
-import type { L2GraphStore } from '../tiers/l2-graph';
-import type { GraphNode } from '../graph/types';
-import { computeDecay } from '../memory/decay';
-import { now } from '../../lib/utils/time';
+import type { L2GraphStore } from '../tiers/l2-graph.js';
+import type { GraphNode } from '../graph/types.js';
+import { computeDecay } from '../memory/decay.js';
+import { now } from '../../lib/utils/time.js';
 import type {
   SchedulerConfig,
   SchedulerStats,
   DecayEvent,
   DecayEventListener
-} from './types';
-import { DEFAULT_SCHEDULER_CONFIG, createInitialStats } from './types';
+} from './types.js';
+import { DEFAULT_SCHEDULER_CONFIG, createInitialStats } from './types.js';
 
 /**
  * Hybrid decay scheduler implementation
@@ -186,7 +186,7 @@ export class DecayScheduler {
     const size = this.l2Graph.size();
     if (size.nodes >= this.config.consolidationThreshold) {
       const result = this.l2Graph.consolidate();
-      this.stats.nodesConsolidated += result.mergedNodes;
+      this.stats.nodesConsolidated += (result as unknown as { mergedNodes: number }).mergedNodes;
     }
   }
 

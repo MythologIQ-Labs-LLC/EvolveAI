@@ -3,10 +3,10 @@
  * Main execution phase with pipeline tracing
  */
 
-import type { PipelineTrace, BaseContext, FiberBudget } from '../types';
-import type { Query, RecallResult } from '../../memory/types';
-import { createTrace, completeTrace, failTrace } from '../trace';
-import { now } from '../../../lib/utils/time';
+import type { PipelineTrace, BaseContext, FiberBudget } from '../types.js';
+import type { Query, RecallResult } from '../../memory/types.js';
+import { createTrace, completeTrace, failTrace } from '../trace.js';
+import { now } from '../../../lib/utils/time.js';
 
 /**
  * Active flow execution context

@@ -3,9 +3,9 @@
  * Semantic Pause safety check during lifecycle Phase 2
  */
 
-import type { ShadowEntry, ShadowGenome } from './genome';
-import type { FailureCategory } from './failure-types';
-import { cosineSimilarity } from '../memory/decoder';
+import type { ShadowEntry, ShadowGenome } from './genome.js';
+import type { FailureCategory } from './failure-types.js';
+import { cosineSimilarity } from '../memory/decoder.js';
 
 /**
  * Intent payload for safety checking

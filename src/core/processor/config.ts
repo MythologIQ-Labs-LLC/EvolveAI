@@ -3,14 +3,22 @@
  * Unified configuration for all subsystems
  */
 
-import type { LifecycleConfig, DEFAULT_LIFECYCLE_CONFIG } from '../lifecycle/types';
-import type { DecayConfig, DEFAULT_DECAY_CONFIG } from '../memory/decay';
-import type { MTSWeights, TierThresholds, DEFAULT_MTS_WEIGHTS, DEFAULT_TIER_THRESHOLDS } from '../tiers/types';
-import type { L1CacheConfig, DEFAULT_L1_CONFIG } from '../tiers/l1-cache';
-import type { L2GraphConfig, DEFAULT_L2_CONFIG } from '../tiers/l2-graph';
-import type { L3VaultConfig, DEFAULT_L3_CONFIG } from '../tiers/l3-vault';
-import type { ShadowGenomeConfig, DEFAULT_SHADOW_CONFIG } from '../shadow/genome';
-import type { InterceptorConfig, DEFAULT_INTERCEPTOR_CONFIG } from '../shadow/interceptor';
+import type { LifecycleConfig } from '../lifecycle/types.js';
+import { DEFAULT_LIFECYCLE_CONFIG } from '../lifecycle/types.js';
+import type { DecayConfig } from '../memory/decay.js';
+import { DEFAULT_DECAY_CONFIG } from '../memory/decay.js';
+import type { MTSWeights, TierThresholds } from '../tiers/types.js';
+import { DEFAULT_MTS_WEIGHTS, DEFAULT_TIER_THRESHOLDS } from '../tiers/types.js';
+import type { L1CacheConfig } from '../tiers/l1-cache.js';
+import { DEFAULT_L1_CONFIG } from '../tiers/l1-cache.js';
+import type { L2GraphConfig } from '../tiers/l2-graph.js';
+import { DEFAULT_L2_CONFIG } from '../tiers/l2-graph.js';
+import type { L3VaultConfig } from '../tiers/l3-vault.js';
+import { DEFAULT_L3_CONFIG } from '../tiers/l3-vault.js';
+import type { ShadowGenomeConfig } from '../shadow/genome.js';
+import { DEFAULT_SHADOW_CONFIG } from '../shadow/genome.js';
+import type { InterceptorConfig } from '../shadow/interceptor.js';
+import { DEFAULT_INTERCEPTOR_CONFIG } from '../shadow/interceptor.js';
 
 /**
  * Full processor configuration

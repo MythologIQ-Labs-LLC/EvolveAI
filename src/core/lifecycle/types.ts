@@ -3,7 +3,9 @@
  * 5-Phase Metabolic Lifecycle structures
  */
 
-import type { Phase } from '../memory/types';
+import type { Phase } from '../memory/types.js';
+
+export type { Phase };
 
 /**
  * Base context established during grounding

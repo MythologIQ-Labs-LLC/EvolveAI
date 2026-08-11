@@ -3,13 +3,13 @@
  * 5-Phase Metabolic Lifecycle orchestration
  */
 
-export * from './types';
-export * from './trace';
-export * from './orchestrator';
+export * from './types.js';
+export * from './trace.js';
+export * from './orchestrator.js';
 
 // Phase implementations
-export * from './phases/grounding';
-export * from './phases/semantic-pause';
-export * from './phases/active-flow';
-export * from './phases/detachment';
-export * from './phases/rem-synthesis';
+export * from './phases/grounding.js';
+export * from './phases/semantic-pause.js';
+export * from './phases/active-flow.js';
+export * from './phases/detachment.js';
+export * from './phases/rem-synthesis.js';

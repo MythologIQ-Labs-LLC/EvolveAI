@@ -8,7 +8,7 @@ import {
   isMemoryAlive,
   shouldCrystallize,
   DEFAULT_DECAY_CONFIG
-} from '../../core/memory/decay';
+} from '../../core/memory/decay.js';
 
 describe('Decay Engine (CMHL)', () => {
   describe('computeDecay', () => {

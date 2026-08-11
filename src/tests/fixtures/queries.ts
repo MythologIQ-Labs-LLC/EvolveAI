@@ -2,8 +2,8 @@
  * Test Fixtures: Queries
  */
 
-import type { Query } from '../../core/memory/types';
-import { createMockEmbedding } from './memory-units';
+import type { Query } from '../../core/memory/types.js';
+import { createMockEmbedding } from './memory-units.js';
 
 /**
  * Sample queries

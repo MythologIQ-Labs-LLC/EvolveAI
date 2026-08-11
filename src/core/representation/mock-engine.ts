@@ -4,15 +4,15 @@
  * Uses hash-based embedding generation (no ML dependencies)
  */
 
-import type { RepresentationEngine, EngineConfig } from './engine';
+import type { RepresentationEngine, EngineConfig } from './engine.js';
 import type {
   Representation,
   SimilarityStrategy,
   CrossModelResult,
   EngineCapabilities
-} from './types';
-import { createRepresentation, extractVector } from './types';
-import { cosineSimilarity, euclideanDistance, dotProduct, euclideanToSimilarity } from './similarity';
+} from './types.js';
+import { createRepresentation, extractVector } from './types.js';
+import { cosineSimilarity, euclideanDistance, dotProduct, euclideanToSimilarity } from './similarity.js';
 
 /**
  * Mock engine for testing without ML dependencies

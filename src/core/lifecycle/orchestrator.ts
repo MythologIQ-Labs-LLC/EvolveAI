@@ -6,22 +6,20 @@
 import type {
   LifecycleState,
   LifecycleConfig,
-  PhaseTransition,
-  LifecycleError,
-  PipelineTrace
-} from './types';
-import type { Phase } from '../memory/types';
-import { createInitialState, DEFAULT_LIFECYCLE_CONFIG } from './types';
-import { executeGrounding, type GroundingConfig, type SoulFileRetriever } from './phases/grounding';
-import { executeSemanticPause, createBypassResult, type SemanticPauseResult } from './phases/semantic-pause';
-import { createFlowContext, executeTracedOperation, accumulateResult, hasBudget, type FlowContext, type FlowResult } from './phases/active-flow';
-import { executeDetachment, type DetachmentContext, type DetachmentResult } from './phases/detachment';
-import { executeRemSynthesis, clearProcessedTraces, type SynthesisContext, type SynthesisResult } from './phases/rem-synthesis';
-import type { IntentPayload, ShadowInterceptor } from '../shadow/interceptor';
-import type { L1Cache } from '../tiers/l1-cache';
-import type { L2GraphStore } from '../tiers/l2-graph';
-import type { L3Vault } from '../tiers/l3-vault';
-import { now } from '../../lib/utils/time';
+  PhaseTransition
+} from './types.js';
+import type { Phase } from '../memory/types.js';
+import { createInitialState, DEFAULT_LIFECYCLE_CONFIG } from './types.js';
+import { executeGrounding, type GroundingConfig, type SoulFileRetriever } from './phases/grounding.js';
+import { executeSemanticPause, createBypassResult, type SemanticPauseResult } from './phases/semantic-pause.js';
+import { createFlowContext, executeTracedOperation, accumulateResult, hasBudget, type FlowResult } from './phases/active-flow.js';
+import { executeDetachment, type DetachmentContext, type DetachmentResult } from './phases/detachment.js';
+import { executeRemSynthesis, clearProcessedTraces, type SynthesisContext, type SynthesisResult } from './phases/rem-synthesis.js';
+import type { IntentPayload, ShadowInterceptor } from '../shadow/interceptor.js';
+import type { L1Cache } from '../tiers/l1-cache.js';
+import type { L2GraphStore } from '../tiers/l2-graph.js';
+import type { L3Vault } from '../tiers/l3-vault.js';
+import { now } from '../../lib/utils/time.js';
 
 /**
  * Lifecycle Orchestrator implementation

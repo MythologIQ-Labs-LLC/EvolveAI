@@ -3,9 +3,9 @@
  * Content-aware assessment using representation similarity
  */
 
-import type { RepresentationEngine } from '../representation/engine';
-import type { Representation } from '../representation/types';
-import type { ReferencePatterns } from './reference-patterns';
+import type { RepresentationEngine } from '../representation/engine.js';
+import type { Representation } from '../representation/types.js';
+import type { ReferencePatterns } from './reference-patterns.js';
 
 /**
  * Assessment context with engine and patterns
