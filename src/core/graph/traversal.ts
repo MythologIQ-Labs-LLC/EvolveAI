@@ -7,12 +7,12 @@ import type {
   GraphNode,
   GraphEdge,
   TraversalResult,
-  TraversalOptions,
-  DEFAULT_TRAVERSAL_OPTIONS
-} from './types';
-import { getDecayedWeight, getOtherNodeId } from './edge';
-import { recordAccess } from './node';
-import { now } from '../../lib/utils/time';
+  TraversalOptions
+} from './types.js';
+import { DEFAULT_TRAVERSAL_OPTIONS } from './types.js';
+import { getDecayedWeight, getOtherNodeId } from './edge.js';
+import { recordAccess } from './node.js';
+import { now } from '../../lib/utils/time.js';
 
 /**
  * Graph store interface for traversal

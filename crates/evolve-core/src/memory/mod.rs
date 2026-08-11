@@ -1,10 +1,10 @@
-pub mod types;
 pub mod decay;
-pub mod encoder;
 pub mod decoder;
+pub mod encoder;
+pub mod types;
 
-pub use types::*;
 pub use decay::*;
+pub use types::*;
 
 #[cfg(test)]
 mod tests;

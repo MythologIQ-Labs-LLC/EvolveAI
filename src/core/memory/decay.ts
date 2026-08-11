@@ -3,8 +3,8 @@
  * Section 4 Razor: Pure functions for decay computation
  */
 
-import { now } from '../../lib/utils/time';
-import type { MemoryUnit, Tier } from './types';
+import { now } from '../../lib/utils/time.js';
+import type { MemoryUnit, Tier } from './types.js';
 
 export interface DecayConfig {
   defaultLambda: Record<Tier, number>;
@@ -41,7 +41,7 @@ export function computeDecayedWeight(
   unit: MemoryUnit,
   currentTime: number = now()
 ): number {
-  const { w_0, lambda, t_0 } = unit.metadata;
+  const { w_0, lambda, t_0 } = unit.metadata as { w_0: number; lambda: number; t_0: number };
   return computeDecay(w_0, lambda, t_0, currentTime);
 }
 

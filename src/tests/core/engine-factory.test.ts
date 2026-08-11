@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEngine } from '../../core/representation/factory';
-import { MockEngine } from '../../core/representation/mock-engine';
-import { TransformerEngine } from '../../core/representation/transformer-engine';
+import { createEngine } from '../../core/representation/factory.js';
+import { MockEngine } from '../../core/representation/mock-engine.js';
+import { TransformerEngine } from '../../core/representation/transformer-engine.js';
 
 describe('createEngine', () => {
   describe('Default Behavior', () => {

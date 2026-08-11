@@ -21,22 +21,14 @@ fn make_unit(content: &str, tags: Vec<&str>, embedding_len: usize) -> MemoryUnit
 #[test]
 fn test_route_sensitive_to_l3() {
     let unit = make_unit("sensitive-data", vec!["sensitive"], 384);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L3);
 }
 
 #[test]
 fn test_route_standard_to_l2() {
     let unit = make_unit("normal-data", vec![], 384);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L2);
 }
 
@@ -44,22 +36,14 @@ fn test_route_standard_to_l2() {
 fn test_route_with_custom_thresholds() {
     let unit = make_unit("small-data", vec![], 10);
     let thresholds = TierThresholds { l3: 0.9, l2: 0.5 };
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &thresholds,
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &thresholds);
     assert_eq!(decision.tier, Tier::L1);
 }
 
 #[test]
 fn test_mts_score_calculation() {
     let unit = make_unit("scored-data", vec!["sensitive"], 1000);
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     // sensitivity=1.0*0.4 + accuracy=0.5*0.3 + privilege=1.0*0.2 + compute=1.0*0.1
     // = 0.4 + 0.15 + 0.2 + 0.1 = 0.85
     assert!(decision.mts_score > 0.84);
@@ -70,11 +54,7 @@ fn test_mts_score_calculation() {
 fn test_crystallized_memory_routes_to_l3() {
     let mut unit = make_unit("crystallized", vec![], 32);
     unit.saturation = 0.96;
-    let decision = route_memory_unit(
-        &unit,
-        &MtsWeights::default(),
-        &TierThresholds::default(),
-    );
+    let decision = route_memory_unit(&unit, &MtsWeights::default(), &TierThresholds::default());
     assert_eq!(decision.tier, Tier::L3);
 }
 
@@ -134,7 +114,7 @@ fn test_l2_graph_remove() {
 fn test_l3_vault_store_and_verify() {
     let mut vault = l3_vault::L3Vault::new();
     let unit = make_unit("vault-data", vec!["sensitive"], 64);
-    vault.store(unit);
+    vault.store(unit).unwrap();
     assert_eq!(vault.len(), 1);
     assert!(vault.verify_integrity());
 }
@@ -142,8 +122,8 @@ fn test_l3_vault_store_and_verify() {
 #[test]
 fn test_l3_vault_chain_grows() {
     let mut vault = l3_vault::L3Vault::new();
-    vault.store(make_unit("v1", vec![], 32));
-    vault.store(make_unit("v2", vec![], 32));
+    vault.store(make_unit("v1", vec![], 32)).unwrap();
+    vault.store(make_unit("v2", vec![], 32)).unwrap();
     // genesis + 2 appends = 3 blocks
     assert_eq!(vault.ledger().len(), 3);
 }
@@ -153,7 +133,7 @@ fn test_l3_vault_get_by_address() {
     let mut vault = l3_vault::L3Vault::new();
     let unit = make_unit("addressable", vec![], 32);
     let addr = unit.address.clone();
-    vault.store(unit);
+    vault.store(unit).unwrap();
     assert!(vault.get_by_address(&addr).is_some());
 }
 
@@ -186,8 +166,8 @@ fn test_l2_graph_iter_units() {
 #[test]
 fn test_l3_vault_iter_units() {
     let mut vault = l3_vault::L3Vault::new();
-    vault.store(make_unit("vi1", vec![], 32));
-    vault.store(make_unit("vi2", vec![], 32));
+    vault.store(make_unit("vi1", vec![], 32)).unwrap();
+    vault.store(make_unit("vi2", vec![], 32)).unwrap();
     assert_eq!(vault.iter_units().count(), 2);
 }
 
@@ -240,7 +220,7 @@ fn test_link_to_session_weight_decreases_with_gap() {
     graph.link_to_session(&a3, &session, 10000);
 
     let close_edge = &graph.edges_from(&a3)[0]; // a1 is first in session
-    let far_edge = &graph.edges_from(&a3)[1];   // a2 is second
+    let far_edge = &graph.edges_from(&a3)[1]; // a2 is second
     assert!(close_edge.weight > far_edge.weight);
 }
 
@@ -255,4 +235,153 @@ fn test_link_to_session_skips_missing_peers() {
     let session = vec![(missing, 1000)];
     graph.link_to_session(&a1, &session, 2000);
     assert_eq!(graph.edge_count(), 0);
+}
+
+// --- L3 ledger-backed mutation + content verification (v6.2) ---
+
+#[test]
+fn test_l3_update_with_appends_chain_entry_and_verifies() {
+    let mut vault = l3_vault::L3Vault::new();
+    let unit = make_unit("ledger-backed", vec![], 32);
+    let addr = unit.address.clone();
+    vault.store(unit).unwrap();
+    let len_before = vault.ledger().len();
+
+    let result = vault.update_with(&addr, |u| {
+        u.saturation = 0.5;
+        u.access_count += 1;
+    });
+    assert!(matches!(result, Some(Ok(()))));
+    assert_eq!(vault.ledger().len(), len_before + 1);
+    assert!(vault.verify_full().is_ok());
+    assert_eq!(vault.get(&addr).unwrap().saturation, 0.5);
+}
+
+#[test]
+fn test_l3_update_with_missing_address() {
+    let mut vault = l3_vault::L3Vault::new();
+    let addr = UorAddress::from_content("absent");
+    assert!(vault.update_with(&addr, |u| u.access_count += 1).is_none());
+}
+
+#[test]
+fn test_l3_tamper_behind_ledger_fails_verification() {
+    let mut vault = l3_vault::L3Vault::new();
+    let unit = make_unit("tamper-target", vec![], 32);
+    let addr = unit.address.clone();
+    vault.store(unit).unwrap();
+    assert!(vault.verify_full().is_ok());
+
+    // Mutate behind the ledger's back via the crate-internal raw mutator.
+    vault.get_mut(&addr).unwrap().saturation = 0.99;
+
+    let err = vault.verify_full().unwrap_err();
+    assert_eq!(
+        err,
+        l3_vault::IntegrityError::UnitHashMismatch {
+            address: addr.as_str().to_string()
+        }
+    );
+    // Boolean wrapper reflects the same failure.
+    assert!(!vault.verify_integrity());
+}
+
+#[test]
+fn test_l3_verify_full_names_missing_ledger_entry() {
+    use crate::chain::ledger::Ledger;
+    // A unit present in the vault with no ledger entry at all.
+    let unit = make_unit("orphan", vec![], 32);
+    let addr = unit.address.clone();
+    let vault = l3_vault::L3Vault::from_parts(vec![unit], Ledger::new());
+    let err = vault.verify_full().unwrap_err();
+    assert_eq!(
+        err,
+        l3_vault::IntegrityError::MissingLedgerEntry {
+            address: addr.as_str().to_string()
+        }
+    );
+}
+
+#[test]
+fn test_l3_legacy_bare_hash_blocks_still_verify() {
+    use crate::chain::{hash, ledger::Ledger};
+    // Simulate a pre-5.1 ledger that recorded only the bare content hash.
+    let unit = make_unit("legacy-unit", vec![], 32);
+    let data = serde_json::to_vec(&unit).unwrap();
+    let mut ledger = Ledger::new();
+    ledger.append(hash::content_hash(&data));
+    let vault = l3_vault::L3Vault::from_parts(vec![unit], ledger);
+    assert!(vault.verify_full().is_ok());
+}
+
+#[test]
+fn test_l3_store_rejects_non_finite_saturation() {
+    let mut vault = l3_vault::L3Vault::new();
+    let mut unit = make_unit("nan-sat", vec![], 32);
+    unit.saturation = f32::NAN;
+    let err = vault.store(unit).unwrap_err();
+    assert!(matches!(
+        err,
+        l3_vault::VaultError::NonFinite {
+            field: "saturation",
+            ..
+        }
+    ));
+    // Vault and ledger untouched.
+    assert!(vault.is_empty());
+    assert_eq!(vault.ledger().len(), 1); // genesis only
+    assert!(vault.verify_full().is_ok());
+}
+
+#[test]
+fn test_l3_store_rejects_non_finite_embedding() {
+    let mut vault = l3_vault::L3Vault::new();
+    let mut unit = make_unit("inf-embed", vec![], 32);
+    unit.embedding[0] = f32::INFINITY;
+    let err = vault.store(unit).unwrap_err();
+    assert!(matches!(
+        err,
+        l3_vault::VaultError::NonFinite {
+            field: "embedding",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn test_l3_update_with_rolls_back_invalid_mutation() {
+    let mut vault = l3_vault::L3Vault::new();
+    let mut unit = make_unit("rollback", vec![], 32);
+    unit.saturation = 0.25;
+    let addr = unit.address.clone();
+    vault.store(unit).unwrap();
+    let len_before = vault.ledger().len();
+
+    let result = vault.update_with(&addr, |u| u.saturation = f32::NAN);
+    assert!(matches!(result, Some(Err(_))));
+
+    // Mutation rolled back, no ledger entry appended, still verifiable.
+    assert_eq!(vault.get(&addr).unwrap().saturation, 0.25);
+    assert_eq!(vault.ledger().len(), len_before);
+    assert!(vault.verify_full().is_ok());
+}
+
+#[test]
+fn test_l3_restore_after_update_still_verifies() {
+    use crate::chain::ledger::Ledger;
+    let mut vault = l3_vault::L3Vault::new();
+    let unit = make_unit("roundtrip", vec![], 32);
+    let addr = unit.address.clone();
+    vault.store(unit).unwrap();
+    vault
+        .update_with(&addr, |u| u.saturation = 0.7)
+        .unwrap()
+        .unwrap();
+
+    // Snapshot-style roundtrip: entries + blocks.
+    let entries = vault.entries_vec();
+    let ledger = Ledger::try_from_blocks(vault.ledger().blocks().to_vec()).unwrap();
+    let restored = l3_vault::L3Vault::from_parts(entries, ledger);
+    assert!(restored.verify_full().is_ok());
+    assert_eq!(restored.get(&addr).unwrap().saturation, 0.7);
 }

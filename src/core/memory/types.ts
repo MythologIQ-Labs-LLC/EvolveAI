@@ -14,14 +14,29 @@ export type Phase =
 export type Tier = 'L1' | 'L2' | 'L3';
 
 export interface MemoryMetadata {
-  t_0: number;           // Creation timestamp
-  w_0: number;           // Initial salience (0-1)
-  lambda: number;        // Decay constant
-  mts_score: number;     // Memory Tier Score
+  t_0?: number;          // Creation timestamp
+  w_0?: number;          // Initial salience (0-1)
+  lambda?: number;       // Decay constant
+  mts_score?: number;    // Memory Tier Score
   tier: Tier;            // Assigned tier
-  source_phase: Phase;   // Creating lifecycle phase
+  source_phase?: Phase;  // Creating lifecycle phase
   parent_uor?: string;   // Deprecation pointer
-  session_id: string;    // Creating session
+  session_id?: string;   // Creating session
+  createdAt?: number;    // Creation timestamp (graph-node form)
+  lastAccessedAt?: number; // Last access timestamp
+  accessCount?: number;  // Access count
+  tags?: string[];       // Classification tags
+  type?: string;         // Content type marker
+  source?: string;       // Origin marker
+}
+
+/**
+ * Decay parameters attached to graph nodes
+ */
+export interface DecayParams {
+  w0: number;            // Initial weight
+  lambda: number;        // Decay constant
+  t0: number;            // Reference timestamp
 }
 
 export interface MemoryUnit {
@@ -33,14 +48,15 @@ export interface MemoryUnit {
 
 export interface RawInput {
   content: unknown;
-  metadata?: Partial<Pick<MemoryMetadata, 'w_0' | 'lambda'>>;
+  metadata?: Partial<Pick<MemoryMetadata, 'w_0' | 'lambda' | 'type' | 'source' | 'tags'>>;
   sourcePhase?: Phase;
 }
 
 export interface Query {
   content: string | StructuredQuery;
+  embedding?: Float32Array;
   context: QueryContext;
-  constraints: QueryConstraints;
+  constraints?: QueryConstraints;
 }
 
 export interface StructuredQuery {
@@ -49,9 +65,14 @@ export interface StructuredQuery {
 }
 
 export interface QueryContext {
-  session_id: string;
+  session_id?: string;
   base_context?: BaseContext;
   fiber_budget?: FiberBudget;
+  intent?: string;
+  sensitive?: boolean;
+  uorId?: string;
+  startNodeId?: string;
+  traversalDepth?: number;
 }
 
 export interface QueryConstraints {

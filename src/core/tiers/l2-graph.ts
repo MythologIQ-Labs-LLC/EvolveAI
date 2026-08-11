@@ -3,20 +3,18 @@
  * Graph-based memory with CMHL decay and edge traversal
  */
 
-import type { MemoryUnit } from '../memory/types';
+import type { MemoryUnit } from '../memory/types.js';
 import type {
   GraphNode,
   GraphEdge,
   TraversalResult,
-  TraversalOptions,
-  EdgeType
-} from '../graph/types';
-import { createNode, recordAccess, isStableForCrystallization } from '../graph/node';
-import { createEdge, createEdgesFromSimilarities, getDecayedWeight } from '../graph/edge';
-import { traverseBFS } from '../graph/traversal';
-import { consolidate, type ConsolidationResult, type ConsolidationConfig } from '../graph/consolidation';
-import { cosineSimilarity } from '../memory/decoder';
-import { now } from '../../lib/utils/time';
+  TraversalOptions
+} from '../graph/types.js';
+import { createNode, recordAccess, isStableForCrystallization } from '../graph/node.js';
+import { createEdgesFromSimilarities } from '../graph/edge.js';
+import { traverseBFS } from '../graph/traversal.js';
+import { consolidate, type ConsolidationResult, type ConsolidationConfig } from '../graph/consolidation.js';
+import { cosineSimilarity } from '../memory/decoder.js';
 
 /**
  * L2 Graph Store configuration

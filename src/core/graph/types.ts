@@ -3,7 +3,7 @@
  * L2 Temporal Graph structures with decay-weighted edges
  */
 
-import type { Tier, DecayParams } from '../memory/types';
+import type { Tier, DecayParams } from '../memory/types.js';
 
 /**
  * Semantic relationship types between memory nodes

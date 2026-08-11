@@ -2,7 +2,7 @@
  * Test Fixtures: Memory Units
  */
 
-import type { MemoryUnit, RawInput } from '../../core/memory/types';
+import type { MemoryUnit, RawInput } from '../../core/memory/types.js';
 
 /**
  * Create a mock embedding

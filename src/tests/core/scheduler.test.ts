@@ -4,12 +4,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createL2GraphStore, type L2GraphStore } from '../../core/tiers/l2-graph';
+import { createL2GraphStore, type L2GraphStore } from '../../core/tiers/l2-graph.js';
 import {
   createDecayScheduler,
   type DecayScheduler,
   DEFAULT_SCHEDULER_CONFIG
-} from '../../core/scheduler';
+} from '../../core/scheduler/index.js';
 
 // Mock node creation helper
 function createMockMemoryUnit(id: string) {

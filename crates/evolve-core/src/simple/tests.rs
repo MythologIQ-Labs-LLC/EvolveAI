@@ -50,7 +50,9 @@ async fn test_into_processor_gives_full_access() {
 #[tokio::test]
 async fn test_add_tagged_routes_sensitive_to_l3() {
     let mut mem = SimpleMemory::new();
-    mem.add_tagged("secret", vec!["sensitive".into()]).await.unwrap();
+    mem.add_tagged("secret", vec!["sensitive".into()])
+        .await
+        .unwrap();
     assert!(mem.processor().stats().l3_size > 0);
 }
 
@@ -66,7 +68,11 @@ async fn test_simple_add_file() {
     let dir = std::env::temp_dir().join("evolve-simple-test");
     std::fs::create_dir_all(&dir).ok();
     let path = dir.join("test_ingest.txt");
-    std::fs::write(&path, "First paragraph here is long enough.\n\nSecond paragraph also long enough.").ok();
+    std::fs::write(
+        &path,
+        "First paragraph here is long enough.\n\nSecond paragraph also long enough.",
+    )
+    .ok();
     let mut mem = SimpleMemory::new();
     let result = mem.add_file(&path).await.unwrap();
     assert!(result.chunks > 0);
@@ -79,7 +85,9 @@ async fn test_simple_add_file() {
 async fn test_simple_profile() {
     let mut mem = SimpleMemory::new();
     mem.add("knowledge about rust").await.unwrap();
-    mem.add_tagged("api key", vec!["sensitive".into()]).await.unwrap();
+    mem.add_tagged("api key", vec!["sensitive".into()])
+        .await
+        .unwrap();
     let p = mem.profile();
     assert_eq!(p.total_memories, 2);
     assert!(p.to_summary().contains("Memories: 2"));

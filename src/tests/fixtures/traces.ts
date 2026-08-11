@@ -2,8 +2,8 @@
  * Test Fixtures: Pipeline Traces
  */
 
-import type { PipelineTrace } from '../../core/lifecycle/types';
-import type { FailureTrace, FailureCategory } from '../../core/shadow/failure-types';
+import type { PipelineTrace } from '../../core/lifecycle/types.js';
+import type { FailureTrace, FailureCategory } from '../../core/shadow/failure-types.js';
 
 /**
  * Create a successful trace

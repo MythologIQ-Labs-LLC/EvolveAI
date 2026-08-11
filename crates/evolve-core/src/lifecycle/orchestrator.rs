@@ -65,11 +65,7 @@ impl Orchestrator {
 
     /// IDLE → SEMANTIC_PAUSE → ACTIVE_FLOW (safety passed)
     /// or IDLE → SEMANTIC_PAUSE → IDLE (safety blocked).
-    pub fn begin_operation(
-        &mut self,
-        safety_passed: bool,
-        now: i64,
-    ) -> Result<(), LifecycleError> {
+    pub fn begin_operation(&mut self, safety_passed: bool, now: i64) -> Result<(), LifecycleError> {
         self.assert_phase(Phase::Idle)?;
         self.transition(Phase::SemanticPause, "begin_operation", now);
         if safety_passed {
@@ -81,10 +77,7 @@ impl Orchestrator {
     }
 
     /// Record an operation trace during ACTIVE_FLOW.
-    pub fn record_operation(
-        &mut self,
-        trace: PipelineTrace,
-    ) -> Result<(), LifecycleError> {
+    pub fn record_operation(&mut self, trace: PipelineTrace) -> Result<(), LifecycleError> {
         self.assert_phase(Phase::ActiveFlow)?;
         if let Some(budget) = &mut self.state.budget {
             budget.consume();
@@ -108,10 +101,7 @@ impl Orchestrator {
     }
 
     /// REM_SYNTHESIS → IDLE. Returns accumulated traces for processing.
-    pub fn complete_synthesis(
-        &mut self,
-        now: i64,
-    ) -> Result<Vec<PipelineTrace>, LifecycleError> {
+    pub fn complete_synthesis(&mut self, now: i64) -> Result<Vec<PipelineTrace>, LifecycleError> {
         self.assert_phase(Phase::RemSynthesis)?;
         let traces = std::mem::take(&mut self.state.traces);
         self.transition(Phase::Idle, "synthesis_complete", now);
@@ -126,7 +116,7 @@ impl Orchestrator {
 
     /// Check if budget remains.
     pub fn has_budget(&self, now: i64) -> bool {
-        self.state.budget.as_ref().map_or(true, |b| b.has_budget(now))
+        self.state.budget.as_ref().is_none_or(|b| b.has_budget(now))
     }
 
     fn transition(&mut self, to: Phase, trigger: &str, now: i64) {

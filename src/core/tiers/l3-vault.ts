@@ -3,10 +3,10 @@
  * Immutable hash chain storage with O(1) lookup
  */
 
-import type { MemoryUnit } from '../memory/types';
-import type { Block, ImmutableMemory, IntegrityReport, BlockMetadata } from '../chain/types';
-import { HashChainLedger, createLedger } from '../chain/ledger';
-import { verifyContent } from '../chain/verify';
+import type { MemoryUnit } from '../memory/types.js';
+import type { Block, ImmutableMemory, IntegrityReport, BlockMetadata } from '../chain/types.js';
+import { HashChainLedger, createLedger } from '../chain/ledger.js';
+import { verifyContent } from '../chain/verify.js';
 
 /**
  * L3 Vault configuration

@@ -13,13 +13,24 @@ pub trait RepresentationEngine: Send + Sync {
     fn capabilities(&self) -> &EngineCapabilities;
 
     /// Encode content to representation
-    fn encode(&self, content: &str) -> impl Future<Output = Result<Representation, EngineError>> + Send;
+    fn encode(
+        &self,
+        content: &str,
+    ) -> impl Future<Output = Result<Representation, EngineError>> + Send;
 
     /// Batch encode
-    fn encode_batch(&self, contents: &[&str]) -> impl Future<Output = Result<Vec<Representation>, EngineError>> + Send;
+    fn encode_batch(
+        &self,
+        contents: &[&str],
+    ) -> impl Future<Output = Result<Vec<Representation>, EngineError>> + Send;
 
     /// Compute similarity
-    fn similarity(&self, a: &Representation, b: &Representation, strategy: SimilarityStrategy) -> f32;
+    fn similarity(
+        &self,
+        a: &Representation,
+        b: &Representation,
+        strategy: SimilarityStrategy,
+    ) -> f32;
 
     /// Cross-model comparison
     fn cross_model_similarity(&self, a: &Representation, b: &Representation) -> CrossModelResult;

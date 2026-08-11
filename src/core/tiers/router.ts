@@ -3,17 +3,17 @@
  * Routes memory units to appropriate tiers based on MTS score
  */
 
-import type { Tier, MemoryUnit } from '../memory/types';
+import type { Tier, MemoryUnit } from '../memory/types.js';
 import type {
   MTSWeights,
   TierDecision,
   TierThresholds,
   AssessmentFactors
-} from './types';
+} from './types.js';
 import {
   DEFAULT_MTS_WEIGHTS,
   DEFAULT_TIER_THRESHOLDS
-} from './types';
+} from './types.js';
 
 // Re-export constants for external use
 export { DEFAULT_MTS_WEIGHTS, DEFAULT_TIER_THRESHOLDS };

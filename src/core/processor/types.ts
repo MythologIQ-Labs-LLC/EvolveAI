@@ -3,11 +3,11 @@
  * Main facade types for the agentic memory system
  */
 
-import type { MemoryUnit, Query, RecallResult, Phase, RawInput } from '../memory/types';
-import type { TierDecision } from '../tiers/types';
-import type { SafetyVerdict } from '../shadow/interceptor';
-import type { SynthesisResult } from '../lifecycle/phases/rem-synthesis';
-import type { IntegrityReport } from '../chain/types';
+import type { MemoryUnit, RecallResult, Phase } from '../memory/types.js';
+import type { TierDecision } from '../tiers/types.js';
+import type { SafetyVerdict } from '../shadow/interceptor.js';
+import type { SynthesisResult } from '../lifecycle/phases/rem-synthesis.js';
+import type { IntegrityReport } from '../chain/types.js';
 
 /**
  * Processor initialization result

@@ -17,7 +17,12 @@ fn make_raw_input(content: &str, tags: Vec<&str>) -> RawInput {
     }
 }
 
-fn make_unit_with_embedding(content: &str, embedding: Vec<f32>, last_accessed: i64, saturation: f32) -> MemoryUnit {
+fn make_unit_with_embedding(
+    content: &str,
+    embedding: Vec<f32>,
+    last_accessed: i64,
+    saturation: f32,
+) -> MemoryUnit {
     MemoryUnit {
         address: UorAddress::from_content(content),
         embedding,
@@ -36,7 +41,9 @@ async fn test_encode_produces_valid_unit() {
     let engine = MockEngine::new(32);
     let input = make_raw_input("hello world", vec![]);
     let config = EncoderConfig::default();
-    let unit = encoder::encode(&input, &engine, &config, 1000).await.unwrap();
+    let unit = encoder::encode(&input, &engine, &config, 1000)
+        .await
+        .unwrap();
     assert_eq!(unit.embedding.len(), 32);
     assert_eq!(unit.created_at, 1000);
 }
@@ -46,7 +53,9 @@ async fn test_encode_sensitive_routes_to_l3() {
     let engine = MockEngine::new(384);
     let input = make_raw_input("secret data", vec!["sensitive"]);
     let config = EncoderConfig::default();
-    let unit = encoder::encode(&input, &engine, &config, 1000).await.unwrap();
+    let unit = encoder::encode(&input, &engine, &config, 1000)
+        .await
+        .unwrap();
     assert_eq!(unit.metadata.tier, Tier::L3);
 }
 
@@ -55,7 +64,9 @@ async fn test_encode_produces_content_address() {
     let engine = MockEngine::new(32);
     let input = make_raw_input("deterministic content", vec![]);
     let config = EncoderConfig::default();
-    let unit = encoder::encode(&input, &engine, &config, 1000).await.unwrap();
+    let unit = encoder::encode(&input, &engine, &config, 1000)
+        .await
+        .unwrap();
     let expected = UorAddress::from_content("deterministic content");
     assert_eq!(unit.address, expected);
 }
@@ -89,7 +100,11 @@ fn test_decode_ranks_by_relevance() {
     let u1 = make_unit_with_embedding("a", vec![1.0, 0.0, 0.0], 1000, 0.0);
     let u2 = make_unit_with_embedding("b", vec![0.5, 0.5, 0.0], 1000, 0.0);
     let query_emb = vec![1.0, 0.0, 0.0];
-    let config = DecoderConfig { top_k: 10, decay_threshold: 0.01, half_life_ms: 3_600_000 };
+    let config = DecoderConfig {
+        top_k: 10,
+        decay_threshold: 0.01,
+        half_life_ms: 3_600_000,
+    };
     let results = decoder::decode(&[&u1, &u2], &query_emb, 1000, &config);
     assert_eq!(results.len(), 2);
     assert!(results[0].relevance_score >= results[1].relevance_score);
@@ -99,7 +114,11 @@ fn test_decode_ranks_by_relevance() {
 fn test_decode_filters_decayed() {
     let u = make_unit_with_embedding("c", vec![1.0, 0.0], 0, 0.0);
     let query_emb = vec![1.0, 0.0];
-    let config = DecoderConfig { top_k: 10, decay_threshold: 0.5, half_life_ms: 1000 };
+    let config = DecoderConfig {
+        top_k: 10,
+        decay_threshold: 0.5,
+        half_life_ms: 1000,
+    };
     // At now=5000, 5 half-lives passed: unsaturated memory decays fully
     let results = decoder::decode(&[&u], &query_emb, 5000, &config);
     assert!(results.is_empty());
@@ -112,7 +131,11 @@ fn test_decode_respects_top_k() {
         .collect();
     let refs: Vec<&MemoryUnit> = units.iter().collect();
     let query_emb = vec![1.0, 0.0];
-    let config = DecoderConfig { top_k: 5, decay_threshold: 0.01, half_life_ms: 3_600_000 };
+    let config = DecoderConfig {
+        top_k: 5,
+        decay_threshold: 0.01,
+        half_life_ms: 3_600_000,
+    };
     let results = decoder::decode(&refs, &query_emb, 1000, &config);
     assert_eq!(results.len(), 5);
 }

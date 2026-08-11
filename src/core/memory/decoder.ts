@@ -3,18 +3,17 @@
  * Section 4 Razor: Single responsibility - decoding pipeline
  */
 
-import { generateUorId } from '../../lib/utils/id';
-import { now } from '../../lib/utils/time';
-import { computeDecayedWeight, applyDecayFilter, DEFAULT_DECAY_CONFIG } from './decay';
+import { generateUorId } from '../../lib/utils/id.js';
+import { now } from '../../lib/utils/time.js';
+import { computeDecayedWeight, DEFAULT_DECAY_CONFIG } from './decay.js';
 import type {
   Query,
   RecallResult,
   MemoryUnit,
   ScoredMemory,
   RetrievalTrace,
-  TraceStep,
   Tier
-} from './types';
+} from './types.js';
 
 export interface DecoderConfig {
   topK: number;
@@ -91,7 +90,7 @@ function scoreMemories(
 /**
  * Cosine similarity between two vectors
  */
-function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   if (a.length !== b.length) return 0;
   let dotProduct = 0;
   let normA = 0;
@@ -124,13 +123,14 @@ export async function decode(
   addTraceStep(trace, 'DISPATCH', { resolverType });
 
   // Step 2: Determine tiers to query
-  const tiersToQuery: Tier[] = query.constraints.require_l3
+  const constraints = query.constraints as NonNullable<Query['constraints']>;
+  const tiersToQuery: Tier[] = constraints.require_l3
     ? ['L3']
     : ['L1', 'L2', 'L3'];
   addTraceStep(trace, 'GROUND', { tiersToQuery });
 
   // Step 3: Query tiers
-  const topK = query.constraints.top_k ?? config.topK;
+  const topK = constraints.top_k ?? config.topK;
   const tierResults = await Promise.all(
     tiersToQuery.map(tier => tierQueryFn(tier, queryEmbedding, topK))
   );

@@ -42,6 +42,12 @@ pub fn check_intent(
     let mut matches: Vec<(String, f32)> = Vec::new();
 
     for entry in &entries {
+        // Entries recorded without a comparable embedding (engine was down
+        // at failure time, or a different embedding dimensionality) cannot
+        // be similarity-matched; they still count in genome stats.
+        if entry.embedding.is_empty() || entry.embedding.len() != intent_embedding.len() {
+            continue;
+        }
         let sim = cosine_similarity(intent_embedding, &entry.embedding);
         let threshold = effective_threshold(entry.category, config);
 

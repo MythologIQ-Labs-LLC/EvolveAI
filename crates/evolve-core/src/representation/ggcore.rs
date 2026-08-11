@@ -60,11 +60,16 @@ impl RepresentationEngine for GgCoreEngine {
 
     async fn encode(&self, content: &str) -> Result<Representation, EngineError> {
         let input = InferenceInput::Text(content.to_string());
-        let output = self.embedder.infer(&input, &Self::embedding_config()).await
+        let output = self
+            .embedder
+            .infer(&input, &Self::embedding_config())
+            .await
             .map_err(|e| EngineError::EncodingFailed(e.to_string()))?;
 
         match output {
-            InferenceOutput::Embedding(r) => Ok(Representation::from_vector(&self.model_id, r.vector)),
+            InferenceOutput::Embedding(r) => {
+                Ok(Representation::from_vector(&self.model_id, r.vector))
+            }
             _ => Err(EngineError::EncodingFailed("unexpected output type".into())),
         }
     }
@@ -78,7 +83,12 @@ impl RepresentationEngine for GgCoreEngine {
         Ok(results)
     }
 
-    fn similarity(&self, a: &Representation, b: &Representation, strategy: SimilarityStrategy) -> f32 {
+    fn similarity(
+        &self,
+        a: &Representation,
+        b: &Representation,
+        strategy: SimilarityStrategy,
+    ) -> f32 {
         let va = a.as_vector();
         let vb = b.as_vector();
         match strategy {

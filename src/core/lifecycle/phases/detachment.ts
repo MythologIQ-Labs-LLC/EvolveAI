@@ -3,9 +3,9 @@
  * Clean up transient state and prepare for synthesis
  */
 
-import type { PipelineTrace, LifecycleConfig } from '../types';
-import type { L1Cache } from '../../tiers/l1-cache';
-import type { L2GraphStore } from '../../tiers/l2-graph';
+import type { PipelineTrace, LifecycleConfig } from '../types.js';
+import type { L1Cache } from '../../tiers/l1-cache.js';
+import type { L2GraphStore } from '../../tiers/l2-graph.js';
 
 /**
  * Detachment result
@@ -92,7 +92,7 @@ export function executeImmediateDetachment(
  */
 export function executeBatchedDetachment(
   l1Cache?: L1Cache,
-  evictionThreshold: number = 0.5
+  _evictionThreshold: number = 0.5
 ): { evicted: number } {
   if (!l1Cache) return { evicted: 0 };
 

@@ -12,22 +12,23 @@ import type {
   HealthCheckResult,
   ProcessorEvent,
   ProcessorEventListener
-} from './types';
-import type { ProcessorConfig } from './config';
-import { createProcessorConfig, DEFAULT_PROCESSOR_CONFIG, validateConfig } from './config';
-import type { RawInput, Query, RecallResult, MemoryUnit } from '../memory/types';
-import { encodeInput, createEncoder } from '../memory/encoder';
-import { decodeQuery, createDecoder } from '../memory/decoder';
-import { routeMemoryUnit } from '../tiers/router';
-import { createL1Cache, type L1Cache } from '../tiers/l1-cache';
-import { createL2GraphStore, type L2GraphStore } from '../tiers/l2-graph';
-import { createL3Vault, type L3Vault } from '../tiers/l3-vault';
-import { createShadowGenome, type ShadowGenome } from '../shadow/genome';
-import { createInterceptor, type ShadowInterceptor, type IntentPayload } from '../shadow/interceptor';
-import { createOrchestrator, type LifecycleOrchestrator } from '../lifecycle/orchestrator';
-import type { GroundingConfig } from '../lifecycle/phases/grounding';
-import { now } from '../../lib/utils/time';
-import { generateId } from '../../lib/utils/id';
+} from './types.js';
+import type { ProcessorConfig } from './config.js';
+import { createProcessorConfig, validateConfig } from './config.js';
+import type { RawInput, Query, RecallResult, MemoryUnit } from '../memory/types.js';
+import { encode as encodeInput } from '../memory/encoder.js';
+import { decode as decodeQuery } from '../memory/decoder.js';
+import { routeMemoryUnit } from '../tiers/router.js';
+import type { TierDecision } from '../tiers/types.js';
+import { createL1Cache, type L1Cache } from '../tiers/l1-cache.js';
+import { createL2GraphStore, type L2GraphStore } from '../tiers/l2-graph.js';
+import { createL3Vault, type L3Vault } from '../tiers/l3-vault.js';
+import { createShadowGenome, type ShadowGenome } from '../shadow/genome.js';
+import { createInterceptor, type ShadowInterceptor, type IntentPayload } from '../shadow/interceptor.js';
+import { createOrchestrator, type LifecycleOrchestrator } from '../lifecycle/orchestrator.js';
+import type { GroundingConfig } from '../lifecycle/phases/grounding.js';
+import { now } from '../../lib/utils/time.js';
+import { generateSessionId as generateId } from '../../lib/utils/id.js';
 
 /**
  * Neural Net Processor - Main entry point
@@ -116,7 +117,7 @@ export class NeuralNetProcessor {
 
     try {
       // Create memory unit
-      const unit = await encodeInput(input, {
+      const unit = await (encodeInput as (...args: unknown[]) => Promise<MemoryUnit>)(input, {
         ...this.config.mtsWeights,
         embeddingDimension: this.config.embedding.dimensions
       });
@@ -156,8 +157,8 @@ export class NeuralNetProcessor {
       const message = error instanceof Error ? error.message : String(error);
       this.emit({ type: 'ERROR', error: message });
       return {
-        unit: null as any,
-        tierDecision: null as any,
+        unit: null as unknown as MemoryUnit,
+        tierDecision: null as unknown as TierDecision,
         success: false,
         error: message
       };
@@ -173,7 +174,7 @@ export class NeuralNetProcessor {
 
     try {
       // Decode query across tiers
-      const recall = await decodeQuery(query, {
+      const recall = await (decodeQuery as (...args: unknown[]) => Promise<RecallResult>)(query, {
         l1Cache: this.l1Cache,
         l2Graph: this.l2Graph,
         l3Vault: this.l3Vault,
@@ -189,7 +190,7 @@ export class NeuralNetProcessor {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
-        recall: { memories: [], trace: null as any },
+        recall: { memories: [], trace: null } as unknown as RecallResult,
         phase: this.orchestrator.getCurrentPhase(),
         executionTimeMs: now() - startTime,
         success: false,
@@ -343,5 +344,5 @@ export function createProcessor(config?: Partial<ProcessorConfig>): NeuralNetPro
 }
 
 // Re-export types
-export * from './types';
-export * from './config';
+export * from './types.js';
+export * from './config.js';

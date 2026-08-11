@@ -1,63 +1,72 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+/**
+ * EvolveAI desktop control panel. Wires the full Tauri command surface
+ * (see src-tauri/src/main.rs) into one dependency-light React page.
+ */
+import * as api from "./api";
+import { Badge, KV, Output, Row, useCall } from "./common";
+import {
+  MemoryPanel,
+  MetabolismPanel,
+  PersistencePanel,
+  ProfilePanel,
+  SafetyPanel,
+  TrustPanel,
+} from "./panels";
+import "./styles.css";
 
-export function App() {
-  const [content, setContent] = useState("");
-  const [result, setResult] = useState("");
-  const [stats, setStats] = useState("");
-
-  async function handleEncode() {
-    try {
-      const res = await invoke("encode_memory", { content, tags: [] });
-      setResult(JSON.stringify(res, null, 2));
-    } catch (e) {
-      setResult(String(e));
-    }
-  }
-
-  async function handleQuery() {
-    try {
-      const res = await invoke("query_memory", { content });
-      setResult(JSON.stringify(res, null, 2));
-    } catch (e) {
-      setResult(String(e));
-    }
-  }
-
-  async function handleStats() {
-    try {
-      const res = await invoke("get_stats");
-      setStats(JSON.stringify(res, null, 2));
-    } catch (e) {
-      setStats(String(e));
-    }
-  }
+function StatusBar() {
+  const health = useCall<boolean>();
+  const stats = useCall<api.StatsResponse>();
 
   return (
-    <div style={{ padding: 24, fontFamily: "monospace", maxWidth: 800 }}>
-      <h1>EvolveAI</h1>
-      <p style={{ color: "#888" }}>Autopoietic Memory System</p>
-      <input
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Enter content..."
-        style={{ width: "100%", padding: 8, fontSize: 14 }}
-      />
-      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-        <button onClick={handleEncode}>Encode</button>
-        <button onClick={handleQuery}>Query</button>
-        <button onClick={handleStats}>Stats</button>
+    <header className="statusbar">
+      <div>
+        <h1>EvolveAI</h1>
+        <p className="muted">Autopoietic Memory System — control panel</p>
       </div>
-      {result && (
-        <pre style={{ marginTop: 16, background: "#f5f5f5", padding: 12 }}>
-          {result}
-        </pre>
-      )}
-      {stats && (
-        <pre style={{ marginTop: 16, background: "#eef", padding: 12 }}>
-          {stats}
-        </pre>
-      )}
+      <Row>
+        <button onClick={() => health.run(() => api.healthCheck())}>Health check</button>
+        <button onClick={() => stats.run(() => api.getStats())}>Refresh stats</button>
+      </Row>
+      <Output
+        state={health.state}
+        render={(ok) => <Badge ok={ok} yes="Healthy" no="Unhealthy" />}
+      />
+      <Output
+        state={stats.state}
+        render={(s) => (
+          <KV
+            items={[
+              ["L1 size", s.l1_size],
+              ["L2 nodes / edges", `${s.l2_nodes} / ${s.l2_edges}`],
+              ["L3 size", s.l3_size],
+              ["L3 chain length", s.l3_chain_length],
+              [
+                "L3 integrity",
+                <Badge key="i" ok={s.l3_integrity} yes="intact" no="BROKEN" />,
+              ],
+              ["Phase", s.phase],
+              ["Traces", s.trace_count],
+            ]}
+          />
+        )}
+      />
+    </header>
+  );
+}
+
+export function App() {
+  return (
+    <div className="app">
+      <StatusBar />
+      <main className="grid">
+        <MemoryPanel />
+        <TrustPanel />
+        <MetabolismPanel />
+        <ProfilePanel />
+        <SafetyPanel />
+        <PersistencePanel />
+      </main>
     </div>
   );
 }

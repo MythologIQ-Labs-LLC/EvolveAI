@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MythologIQ-Labs-LLC/EvolveAI/schemas/memory-exchange.schema.json",
+  "title": "EvolveAI Memory Exchange Envelope",
+  "description": "Versioned export/import envelope for EvolveAI memory units. Mirrors the schema conventions of MythologIQ-Labs-LLC/agent-memory (JSON Schema draft 2020-12, repo-path $id, semver schema_version, closed objects). An envelope is an evidence-bearing snapshot of exported memory, not a grant of authority: importing systems MUST treat every unit as acquisition_mode 'imported' with local trust and lifecycle state re-derived under their own governance (agent-memory docs/35-interoperability-profiles.md, 'Authority conflict between systems').",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "exporter", "attestation", "memories"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver of this exchange contract. This document describes 1.0.0."
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementation", "version", "exported_at"],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "description": "Producing implementation, e.g. 'evolve-core'."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the producing implementation."
+        },
+        "snapshot_version": {
+          "type": "string",
+          "description": "Internal snapshot format version of the exporting store (evolve-core SNAPSHOT_VERSION), when the export was derived from a persisted snapshot."
+        },
+        "doctrine_ref": {
+          "type": "string",
+          "description": "Pointer to the doctrine repo/version this export claims alignment with, e.g. 'MythologIQ-Labs-LLC/agent-memory'."
+        },
+        "exported_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ledger_head", "content_address_algorithm", "block_hash_algorithm"],
+      "description": "Provenance attestation binding the export to the exporting ledger head. Proves which chain state produced the export; it does NOT prove that every exported unit's content matches its ledgered hash (see INTEROP.md, L3 mutability lesson).",
+      "properties": {
+        "ledger_head": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["index", "hash"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0, "description": "Index of the latest block in the exporting hash chain." },
+            "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Hex hash of the latest block." },
+            "timestamp": { "type": "integer", "description": "Block timestamp, Unix epoch milliseconds (evolve-core native representation)." }
+          }
+        },
+        "genesis_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash of the exporting chain's genesis block, identifying the chain lineage."
+        },
+        "chain_length": { "type": "integer", "minimum": 1 },
+        "content_address_algorithm": {
+          "type": "string",
+          "enum": ["blake3"],
+          "description": "Algorithm producing memory content addresses (UorAddress)."
+        },
+        "block_hash_algorithm": {
+          "type": "string",
+          "enum": ["sha256"],
+          "description": "Algorithm producing ledger block hashes."
+        },
+        "chain_verified_at_export": {
+          "type": "boolean",
+          "description": "True if Ledger::verify() (block linkage + block hash recomputation) passed at export time. Note: this verifies linkage only, not stored-entry-to-data_hash correspondence."
+        }
+      }
+    },
+    "memories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exchange_memory_unit" }
+    }
+  },
+  "$defs": {
+    "exchange_memory_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "tier", "state", "saturation", "trust", "provenance", "created_at"],
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "BLAKE3 content address (UorAddress) of the original content. Identity contract: identical content yields identical address. Importers that receive 'content' MUST recompute and compare before treating the address as verified identity; an address without content is a reference, not proof."
+        },
+        "content": {
+          "type": ["string", "null"],
+          "description": "Raw content, when the exporter retains it. evolve-core MemoryUnit stores an embedding, not raw content, so exports from the current implementation carry null here unless content is supplied from an external store; the address then cannot be independently re-verified by the importer."
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["text", "structured", "binary"]
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["L1", "L2", "L3"],
+          "description": "Exporting tier at export time. Advisory routing fact, not an instruction: importers route under their own policy."
+        },
+        "state": {
+          "type": "string",
+          "enum": ["transient", "observed", "linked", "reinforced", "candidate", "pending_verification", "crystallized", "stale", "disputed", "pruned"],
+          "description": "Lifecycle state mapped to the agent-memory lifecycle vocabulary (agent-memory docs/02-lifecycle-state-machine.md, schemas/memory-unit.schema.json 'state'). See INTEROP.md section 3 for the EvolveAI tier-to-state mapping and its declared subset."
+        },
+        "saturation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sigma", "score_kind", "calibrated"],
+          "properties": {
+            "sigma": { "type": "number", "minimum": 0, "maximum": 1 },
+            "score_kind": {
+              "type": "string",
+              "enum": ["lifecycle_routing_score"],
+              "description": "Declared semantics per agent-memory docs/03-scoring-and-decay.md: sigma is an ordinal routing score, never a calibrated probability."
+            },
+            "calibrated": {
+              "type": "boolean",
+              "description": "Always false for current evolve-core exports; no calibration protocol run exists yet."
+            },
+            "crystallization_threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "decay": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "type": "string",
+              "enum": ["cmhl_thermodynamic"],
+              "description": "w = exp(-lambda_eff * elapsed), lambda_eff = (ln2 / half_life_ms) * (1 - sigma) * ln2. See crates/evolve-core/src/memory/decay.rs."
+            },
+            "half_life_ms": { "type": "integer", "minimum": 1 },
+            "pressure": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Memory-pressure factor at export; pressure shortens effective half-life (crates/evolve-core/src/processor/slo.rs)."
+            },
+            "decayed_weight_at_export": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level"],
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": ["unverified", "user_reviewed", "verified"],
+              "description": "Exporter-local trust classification (evolve-core TrustLevel). Evidence about the exporter's view; MUST NOT be imported as local trust — importers re-derive trust under their own source-trust policy (agent-memory docs/16-source-trust-and-reputation.md)."
+            },
+            "initial_saturation": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["origin", "observer", "method", "timestamp"],
+          "description": "Mirrors the required provenance block of agent-memory schemas/memory-unit.schema.json.",
+          "properties": {
+            "origin": { "type": "string", "description": "Source system or InputMetadata.source of the original ingestion; 'unknown' when the exporter did not record one." },
+            "observer": { "type": "string", "description": "Component that encoded the memory, e.g. 'evolve-core/encoder'." },
+            "method": { "type": "string", "description": "Acquisition method, e.g. 'cli_add', 'file_ingest', 'tauri_remember'." },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "source_refs": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "last_accessed_at": { "type": "string", "format": "date-time" },
+        "access_count": { "type": "integer", "minimum": 0 },
+        "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "mts_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "edges": {
+          "type": "array",
+          "description": "Outgoing associative edges from the L2 temporal graph. Edge weight is an associative signal, never authority or identity.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "weight"],
+            "properties": {
+              "target": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "weight": { "type": "number" },
+              "created_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "ledger_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Present only for L3 units: the chain block recording this unit's crystallization append.",
+          "properties": {
+            "block_index": { "type": "integer", "minimum": 1 },
+            "block_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "data_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the serialized MemoryUnit as appended at crystallization time. May not match the unit's current serialized form (see INTEROP.md, L3 mutability lesson)." }
+          }
+        }
+      }
+    }
+  }
+}

@@ -3,9 +3,9 @@
  * Fast vector-based memory with TTL eviction
  */
 
-import type { MemoryUnit, Tier } from '../memory/types';
-import { now } from '../../lib/utils/time';
-import { cosineSimilarity } from '../memory/decoder';
+import type { MemoryUnit } from '../memory/types.js';
+import { now } from '../../lib/utils/time.js';
+import { cosineSimilarity } from '../memory/decoder.js';
 
 /**
  * L1 Cache configuration

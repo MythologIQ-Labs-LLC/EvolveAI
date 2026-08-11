@@ -1,6 +1,6 @@
 use super::*;
-use crate::representation::mock::MockEngine;
 use crate::representation::engine::RepresentationEngine;
+use crate::representation::mock::MockEngine;
 
 #[test]
 fn test_cosine_similarity_identical_vectors() {
@@ -122,5 +122,8 @@ fn test_create_mock_engine_via_factory() {
 #[test]
 fn test_engine_type_default() {
     let engine_type = crate::representation::factory::EngineType::default();
-    assert!(matches!(engine_type, crate::representation::factory::EngineType::Mock { dimensions: 384 }));
+    assert!(matches!(
+        engine_type,
+        crate::representation::factory::EngineType::Mock { dimensions: 384 }
+    ));
 }

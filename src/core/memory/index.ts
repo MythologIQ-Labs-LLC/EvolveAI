@@ -2,7 +2,7 @@
  * Memory system entry point
  */
 
-export * from './types';
-export * from './decay';
-export * from './encoder';
-export * from './decoder';
+export * from './types.js';
+export * from './decay.js';
+export * from './encoder.js';
+export * from './decoder.js';
