@@ -871,7 +871,7 @@ dependencies = [
 
 [[package]]
 name = "evolve-app"
-version = "0.1.0"
+version = "6.1.0"
 dependencies = [
  "chrono",
  "evolve-core",
@@ -883,8 +883,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "evolve-cli"
+version = "6.1.0"
+dependencies = [
+ "chrono",
+ "evolve-core",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "evolve-core"
-version = "5.1.0"
+version = "6.1.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1266,6 +1276,7 @@ dependencies = [
  "aes-gcm",
  "aho-corasick",
  "async-trait",
+ "bumpalo",
  "chrono",
  "dashmap",
  "futures",
