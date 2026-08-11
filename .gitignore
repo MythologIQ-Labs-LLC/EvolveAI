@@ -97,3 +97,6 @@ Thumbs.db
 
 # Vite frontend build output (Tauri shell)
 dist-ui/
+
+# Tauri build-generated ACL schemas
+src-tauri/gen/
