@@ -62,6 +62,7 @@ pub async fn feedback(
     let addr = UorAddress(address);
     let mut proc = processor.lock().await;
     let found = proc.record_access(&addr, pin_event);
+    crate::persistence::mark_dirty();
     Ok(FeedbackResponse { found })
 }
 
@@ -73,7 +74,9 @@ pub async fn dispute(
 ) -> Result<Option<f32>, String> {
     let addr = UorAddress(address);
     let mut proc = processor.lock().await;
-    Ok(proc.record_conflict(&addr, severity))
+    let result = proc.record_conflict(&addr, severity);
+    crate::persistence::mark_dirty();
+    Ok(result)
 }
 
 #[tauri::command]
@@ -83,7 +86,9 @@ pub async fn approve_crystallization(
 ) -> Result<bool, String> {
     let addr = UorAddress(address);
     let mut proc = processor.lock().await;
-    Ok(proc.approve_crystallization(&addr))
+    let approved = proc.approve_crystallization(&addr);
+    crate::persistence::mark_dirty();
+    Ok(approved)
 }
 
 #[tauri::command]
@@ -93,7 +98,9 @@ pub async fn forget_memory(
 ) -> Result<bool, String> {
     let addr = UorAddress(address);
     let mut proc = processor.lock().await;
-    Ok(proc.forget(&addr))
+    let forgotten = proc.forget(&addr);
+    crate::persistence::mark_dirty();
+    Ok(forgotten)
 }
 
 #[tauri::command]
@@ -146,9 +153,7 @@ pub async fn get_related(
 }
 
 #[tauri::command]
-pub async fn get_pending(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<Vec<String>, String> {
+pub async fn get_pending(processor: State<'_, Mutex<AppProcessor>>) -> Result<Vec<String>, String> {
     let proc = processor.lock().await;
     let addrs: Vec<String> = proc
         .pending_crystallizations()

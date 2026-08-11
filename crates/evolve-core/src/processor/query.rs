@@ -6,7 +6,7 @@
 
 use crate::memory::decoder::{self, DecoderConfig};
 use crate::memory::types::*;
-use crate::processor::types::{QueryResult, tier_list};
+use crate::processor::types::{tier_list, QueryResult};
 use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::tiers::l1_cache::L1Cache;
 use crate::tiers::l2_graph::L2Graph;
@@ -67,6 +67,7 @@ pub fn collect_candidates<'a>(
 
 /// Full vector-scan query: encode the query, gather candidates from
 /// relevant tiers, score via the decoder, and return ranked results.
+#[allow(clippy::too_many_arguments)]
 pub async fn vector_scan<E: RepresentationEngine>(
     engine: &E,
     decoder_config: &DecoderConfig,

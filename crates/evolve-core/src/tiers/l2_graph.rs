@@ -38,7 +38,11 @@ impl L2Graph {
             return;
         }
         let edges = self.edges.entry(from).or_default();
-        edges.push(Edge { target: to, weight, created_at: now });
+        edges.push(Edge {
+            target: to,
+            weight,
+            created_at: now,
+        });
     }
 
     /// Get a node by address.
@@ -123,7 +127,10 @@ impl L2Graph {
     /// Reconstruct from parts.
     pub fn from_parts(nodes: Vec<MemoryUnit>, edges: HashMap<UorAddress, Vec<Edge>>) -> Self {
         let node_map = nodes.into_iter().map(|u| (u.address.clone(), u)).collect();
-        Self { nodes: node_map, edges }
+        Self {
+            nodes: node_map,
+            edges,
+        }
     }
 }
 

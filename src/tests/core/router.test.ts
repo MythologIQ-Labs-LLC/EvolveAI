@@ -9,12 +9,12 @@ import {
   routeMemoryUnit,
   DEFAULT_MTS_WEIGHTS,
   DEFAULT_TIER_THRESHOLDS
-} from '../../core/tiers/router';
+} from '../../core/tiers/router.js';
 import {
   createSampleUnit,
   createHighSensitivityUnit,
   createLowPriorityUnit
-} from '../fixtures/memory-units';
+} from '../fixtures/memory-units.js';
 
 describe('Tier Router', () => {
   describe('calculateMTS', () => {

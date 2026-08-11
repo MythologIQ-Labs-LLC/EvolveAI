@@ -3,10 +3,10 @@
  * Unified creation of representation engines
  */
 
-import type { RepresentationEngine, EngineConfig } from './engine';
-import { DEFAULT_ENGINE_CONFIG } from './engine';
-import { createMockEngine } from './mock-engine';
-import { createTransformerEngine } from './transformer-engine';
+import type { RepresentationEngine, EngineConfig } from './engine.js';
+import { DEFAULT_ENGINE_CONFIG } from './engine.js';
+import { createMockEngine } from './mock-engine.js';
+import { createTransformerEngine } from './transformer-engine.js';
 
 /**
  * Create representation engine from config.

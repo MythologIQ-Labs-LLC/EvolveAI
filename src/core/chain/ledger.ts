@@ -9,9 +9,9 @@ import type {
   MemoryOperation,
   ImmutableMemory,
   IntegrityReport
-} from './types';
-import { createBlock, createGenesisBlock, GENESIS_HASH } from './block';
-import { validateChain, validateBlockIntegrity } from './verify';
+} from './types.js';
+import { createBlock, createGenesisBlock } from './block.js';
+import { validateChain, validateBlockIntegrity } from './verify.js';
 
 /**
  * In-memory hash chain ledger

@@ -1,6 +1,6 @@
 {
   "name": "evolve-ai",
-  "version": "5.2.0",
+  "version": "6.1.0",
   "description": "Autopoietic Memory System - A learning computer that evolves its own neural network-like memory structures",
   "main": "dist/core/processor/index.js",
   "types": "dist/core/processor/index.d.ts",
@@ -11,8 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src",
+    "lint:ui": "eslint ui",
+    "typecheck": "tsc --noEmit",
+    "typecheck:ui": "tsc -p tsconfig.ui.json",
+    "dev:frontend": "vite",
+    "build:frontend": "vite build"
   },
   "keywords": [
     "memory",
@@ -36,6 +40,13 @@
     "@huggingface/transformers": "^3.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "vite": "^5.4.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0",

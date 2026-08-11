@@ -54,8 +54,8 @@ impl Representation {
         if bytes.len() < 2 + model_len + 1 {
             return Err("Invalid byte layout".into());
         }
-        let model_id = String::from_utf8(bytes[2..2 + model_len].to_vec())
-            .map_err(|e| e.to_string())?;
+        let model_id =
+            String::from_utf8(bytes[2..2 + model_len].to_vec()).map_err(|e| e.to_string())?;
         let version = bytes[2 + model_len];
         Ok(Self {
             bytes: bytes.to_vec(),

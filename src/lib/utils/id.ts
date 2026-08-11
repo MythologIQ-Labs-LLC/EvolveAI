@@ -3,7 +3,7 @@
  * Section 4 Razor: Single responsibility - content-addressed identifiers
  */
 
-import { hashObject } from './hash';
+import { hashObject } from './hash.js';
 
 export function generateUorId(content: unknown): string {
   return hashObject(content);

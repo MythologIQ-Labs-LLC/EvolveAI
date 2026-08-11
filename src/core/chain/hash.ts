@@ -3,7 +3,7 @@
  * SHA256 hashing with canonical normalization
  */
 
-import { sha256, hashObject } from '../../lib/utils/hash';
+import { sha256, hashObject } from '../../lib/utils/hash.js';
 
 /**
  * Hash arbitrary content with canonical normalization
@@ -37,7 +37,7 @@ export function computeBlockHash(
   contentHash: string,
   previousHash: string,
   operation: string,
-  metadata: Record<string, unknown>
+  metadata: unknown
 ): string {
   const blockData = {
     index,

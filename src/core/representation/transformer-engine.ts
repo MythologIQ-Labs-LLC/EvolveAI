@@ -3,20 +3,20 @@
  * Real ML embeddings via @huggingface/transformers
  */
 
-import type { RepresentationEngine } from './engine';
+import type { RepresentationEngine } from './engine.js';
 import type {
   Representation,
   SimilarityStrategy,
   CrossModelResult,
   EngineCapabilities
-} from './types';
-import { createRepresentation, extractVector } from './types';
+} from './types.js';
+import { createRepresentation, extractVector } from './types.js';
 import {
   cosineSimilarity,
   euclideanDistance,
   dotProduct,
   euclideanToSimilarity
-} from './similarity';
+} from './similarity.js';
 
 /** Pipeline type from @huggingface/transformers */
 type Pipeline = Awaited<ReturnType<typeof import('@huggingface/transformers').pipeline>>;
@@ -110,7 +110,7 @@ export class TransformerEngine implements RepresentationEngine {
       normalize: this.config.normalize
     });
 
-    const vector = new Float32Array(output.data);
+    const vector = new Float32Array((output as { data: Float32Array }).data);
     return createRepresentation(this.modelId, vector);
   }
 

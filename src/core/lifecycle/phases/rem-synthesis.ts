@@ -3,14 +3,14 @@
  * Learning phase - extract rules and crystallize stable memories
  */
 
-import type { PipelineTrace } from '../types';
-import type { GraphNode } from '../../graph/types';
-import type { L2GraphStore } from '../../tiers/l2-graph';
-import type { L3Vault } from '../../tiers/l3-vault';
-import type { ShadowGenome } from '../../shadow/genome';
-import type { MemoryUnit } from '../../memory/types';
-import { extractSuccessPatterns, extractFailurePatterns } from '../trace';
-import { createFailureTrace } from '../../shadow/failure-types';
+import type { PipelineTrace } from '../types.js';
+import type { GraphNode } from '../../graph/types.js';
+import type { L2GraphStore } from '../../tiers/l2-graph.js';
+import type { L3Vault } from '../../tiers/l3-vault.js';
+import type { ShadowGenome } from '../../shadow/genome.js';
+import type { MemoryUnit } from '../../memory/types.js';
+import { extractSuccessPatterns, extractFailurePatterns } from '../trace.js';
+import { createFailureTrace } from '../../shadow/failure-types.js';
 
 /**
  * Synthesis result
@@ -189,6 +189,6 @@ function extractRules(
 /**
  * Clear traces after synthesis
  */
-export function clearProcessedTraces(traces: PipelineTrace[]): PipelineTrace[] {
+export function clearProcessedTraces(_traces: PipelineTrace[]): PipelineTrace[] {
   return [];
 }

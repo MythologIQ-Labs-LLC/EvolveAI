@@ -12,11 +12,31 @@ pub struct EncodeResponse {
     pub mts_score: f32,
 }
 
+/// One ranked match from a query.
+///
+/// The core stores memories content-addressed (BLAKE3 address + embedding);
+/// the raw text itself is never retained, so there is no `content` field —
+/// the source and tags metadata are the human-readable handles.
+#[derive(Serialize)]
+pub struct QueryMatch {
+    pub address: String,
+    pub tier: String,
+    /// Relevance score against the query embedding (1.0 = exact L3 match).
+    pub score: f32,
+    /// CMHL decay weight at query time.
+    pub decayed_weight: f32,
+    pub saturation: f32,
+    pub source: Option<String>,
+    pub tags: Vec<String>,
+}
+
 #[derive(Serialize)]
 pub struct QueryResponse {
     pub count: usize,
     pub candidates_evaluated: usize,
     pub latency_ms: u64,
+    /// Ranked matches, best first (decoder top-k order).
+    pub results: Vec<QueryMatch>,
 }
 
 #[derive(Serialize)]
@@ -37,6 +57,17 @@ pub struct StatsResponse {
     pub trace_count: usize,
 }
 
+/// Truncate a string to at most `max` characters (char-boundary safe),
+/// appending an ellipsis when anything was cut.
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max).collect();
+    out.push('…');
+    out
+}
+
 #[tauri::command]
 pub async fn encode_memory(
     content: String,
@@ -54,6 +85,7 @@ pub async fn encode_memory(
     let now = chrono::Utc::now().timestamp_millis();
     let mut proc = processor.lock().await;
     let result = proc.encode(&input, now).await.map_err(|e| e.to_string())?;
+    crate::persistence::mark_dirty();
     Ok(EncodeResponse {
         address: result.unit.address.to_string(),
         tier: format!("{:?}", result.decision.tier),
@@ -73,17 +105,30 @@ pub async fn query_memory(
     let now = chrono::Utc::now().timestamp_millis();
     let proc = processor.lock().await;
     let result = proc.query(&query, now).await.map_err(|e| e.to_string())?;
+    let results: Vec<QueryMatch> = result
+        .recall
+        .memories
+        .iter()
+        .map(|m| QueryMatch {
+            address: m.unit.address.to_string(),
+            tier: format!("{:?}", m.unit.metadata.tier),
+            score: m.relevance_score,
+            decayed_weight: m.decayed_weight,
+            saturation: m.unit.saturation,
+            source: m.unit.metadata.source.as_ref().map(|s| truncate(s, 200)),
+            tags: m.unit.metadata.tags.clone(),
+        })
+        .collect();
     Ok(QueryResponse {
         count: result.recall.memories.len(),
         candidates_evaluated: result.recall.metrics.candidates_evaluated,
         latency_ms: result.latency_ms,
+        results,
     })
 }
 
 #[tauri::command]
-pub async fn get_stats(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<StatsResponse, String> {
+pub async fn get_stats(processor: State<'_, Mutex<AppProcessor>>) -> Result<StatsResponse, String> {
     let proc = processor.lock().await;
     let s = proc.stats();
     Ok(StatsResponse {
@@ -104,19 +149,24 @@ pub async fn check_safety(
     processor: State<'_, Mutex<AppProcessor>>,
 ) -> Result<SafetyResponse, String> {
     let mut proc = processor.lock().await;
-    let verdict = proc.check_safety(&intent).await.map_err(|e| e.to_string())?;
+    let verdict = proc
+        .check_safety(&intent)
+        .await
+        .map_err(|e| e.to_string())?;
     match verdict {
-        Verdict::Pass => Ok(SafetyResponse { passed: true, reasoning: None }),
-        Verdict::Block { reasoning, .. } => {
-            Ok(SafetyResponse { passed: false, reasoning: Some(reasoning) })
-        }
+        Verdict::Pass => Ok(SafetyResponse {
+            passed: true,
+            reasoning: None,
+        }),
+        Verdict::Block { reasoning, .. } => Ok(SafetyResponse {
+            passed: false,
+            reasoning: Some(reasoning),
+        }),
     }
 }
 
 #[tauri::command]
-pub async fn health_check(
-    processor: State<'_, Mutex<AppProcessor>>,
-) -> Result<bool, String> {
+pub async fn health_check(processor: State<'_, Mutex<AppProcessor>>) -> Result<bool, String> {
     let proc = processor.lock().await;
     Ok(proc.health_check())
 }
@@ -139,5 +189,8 @@ pub async fn load_state(
 ) -> Result<(), String> {
     let mut proc = processor.lock().await;
     proc.load_from_file(std::path::Path::new(&path))
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // The in-memory state changed; sync the default autosave file to it.
+    crate::persistence::mark_dirty();
+    Ok(())
 }

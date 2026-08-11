@@ -3,6 +3,6 @@
  * Negative-constraint immune system
  */
 
-export * from './failure-types';
-export * from './genome';
-export * from './interceptor';
+export * from './failure-types.js';
+export * from './genome.js';
+export * from './interceptor.js';

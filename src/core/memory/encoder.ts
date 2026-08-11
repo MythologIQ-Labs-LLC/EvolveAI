@@ -3,10 +3,10 @@
  * Section 4 Razor: Single responsibility - encoding pipeline
  */
 
-import { generateUorId, generateSessionId } from '../../lib/utils/id';
-import { now } from '../../lib/utils/time';
-import { getLambdaForTier, DEFAULT_DECAY_CONFIG } from './decay';
-import type { MemoryUnit, RawInput, Tier, Phase, MemoryMetadata } from './types';
+import { generateUorId } from '../../lib/utils/id.js';
+import { now } from '../../lib/utils/time.js';
+import { getLambdaForTier } from './decay.js';
+import type { MemoryUnit, RawInput, Tier, Phase, MemoryMetadata } from './types.js';
 
 export interface EncoderConfig {
   embeddingDimension: number;
@@ -63,17 +63,17 @@ export function determineTier(mtsScore: number): Tier {
   return 'L1';
 }
 
-export function assessSensitivity(content: unknown): number {
+export function assessSensitivity(_content: unknown): number {
   // Placeholder: In production, analyze content for PII, secrets, etc.
   return 0.5;
 }
 
-export function assessAccuracyRequirement(content: unknown): number {
+export function assessAccuracyRequirement(_content: unknown): number {
   // Placeholder: Determine hallucination tolerance
   return 0.5;
 }
 
-export function assessPrivilegeLevel(content: unknown): number {
+export function assessPrivilegeLevel(_content: unknown): number {
   // Placeholder: Determine required access clearance
   return 0.5;
 }

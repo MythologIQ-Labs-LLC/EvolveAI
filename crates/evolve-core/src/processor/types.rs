@@ -1,4 +1,5 @@
 use crate::chain::block::Block;
+use crate::lifecycle::orchestrator::LifecycleConfig;
 use crate::memory::decoder::DecoderConfig;
 use crate::memory::encoder::EncoderConfig;
 use crate::memory::types::{MemoryUnit, RecallResult, Tier, UorAddress};
@@ -8,7 +9,6 @@ use crate::shadow::interceptor::InterceptorConfig;
 use crate::shadow::types::ShadowEntry;
 use crate::tiers::l2_graph::Edge;
 use crate::tiers::router::RouteDecision;
-use crate::lifecycle::orchestrator::LifecycleConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -80,7 +80,9 @@ impl Default for ProcessorConfig {
             l1_max_size: 1000,
             slo: SloThresholds::default(),
             pressure: PressureConfig::default(),
-            crystallization: CrystallizationPolicy::Auto,
+            // ADR-020: learned signals propose, never self-authorize.
+            // σ ≥ 0.95 nominates a unit; `approve_crystallization` commits.
+            crystallization: CrystallizationPolicy::RequireApproval,
         }
     }
 }
@@ -96,6 +98,10 @@ pub enum PersistError {
     ChainIntegrityFailed,
     #[error("incompatible snapshot version: expected {expected}, found {found}")]
     IncompatibleVersion { expected: String, found: String },
+    #[error("snapshot chain is malformed: {0}")]
+    MalformedChain(#[from] crate::chain::ledger::LedgerError),
+    #[error("unit content verification failed: {0}")]
+    UnitIntegrityFailed(#[from] crate::tiers::l3_vault::IntegrityError),
 }
 
 /// Build tier list from optional constraint.

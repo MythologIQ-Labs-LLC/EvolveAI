@@ -3,10 +3,10 @@
  * Memory node creation and management
  */
 
-import type { GraphNode, EdgeType } from './types';
-import type { Tier, DecayParams, MemoryUnit } from '../memory/types';
-import { now } from '../../lib/utils/time';
-import { DEFAULT_DECAY_CONFIG } from '../memory/decay';
+import type { GraphNode } from './types.js';
+import type { Tier, MemoryUnit } from '../memory/types.js';
+import { now } from '../../lib/utils/time.js';
+import { DEFAULT_DECAY_CONFIG } from '../memory/decay.js';
 
 /**
  * Create a new graph node from a memory unit

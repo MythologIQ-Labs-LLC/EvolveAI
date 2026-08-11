@@ -3,19 +3,10 @@ use crate::representation::engine::{EngineError, RepresentationEngine};
 use crate::tiers::router::{route_memory_unit, MtsWeights, TierThresholds};
 
 /// Encoder configuration.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EncoderConfig {
     pub mts_weights: MtsWeights,
     pub tier_thresholds: TierThresholds,
-}
-
-impl Default for EncoderConfig {
-    fn default() -> Self {
-        Self {
-            mts_weights: MtsWeights::default(),
-            tier_thresholds: TierThresholds::default(),
-        }
-    }
 }
 
 /// Encode raw input into a routed MemoryUnit.

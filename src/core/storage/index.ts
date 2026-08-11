@@ -4,8 +4,8 @@
  */
 
 // Types
-export type { StorageAdapter, StorageConfig } from './types';
-export { DEFAULT_STORAGE_CONFIG } from './types';
+export type { StorageAdapter, StorageConfig } from './types.js';
+export { DEFAULT_STORAGE_CONFIG } from './types.js';
 
 // Memory adapter
-export { MemoryAdapter, createMemoryAdapter } from './memory';
+export { MemoryAdapter, createMemoryAdapter } from './memory.js';

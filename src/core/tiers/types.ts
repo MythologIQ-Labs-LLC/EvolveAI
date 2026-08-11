@@ -3,7 +3,7 @@
  * MoE routing and tier-specific storage interfaces
  */
 
-import type { Tier, MemoryUnit } from '../memory/types';
+import type { Tier, MemoryUnit } from '../memory/types.js';
 
 /**
  * MTS (Memory Tier Score) weights

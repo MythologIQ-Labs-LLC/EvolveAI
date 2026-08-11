@@ -871,9 +871,10 @@ dependencies = [
 
 [[package]]
 name = "evolve-app"
-version = "0.1.0"
+version = "6.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "evolve-core",
  "serde",
  "serde_json",
@@ -883,8 +884,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "evolve-cli"
+version = "6.1.0"
+dependencies = [
+ "chrono",
+ "evolve-core",
+ "fd-lock",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "evolve-core"
-version = "5.1.0"
+version = "6.1.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -905,6 +918,17 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "fd-lock"
+version = "4.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce92ff622d6dadf7349484f42c93271a0d49b7cc4d466a936405bacbe10aa78"
+dependencies = [
+ "cfg-if",
+ "rustix",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "fdeflate"
@@ -1266,6 +1290,7 @@ dependencies = [
  "aes-gcm",
  "aho-corasick",
  "async-trait",
+ "bumpalo",
  "chrono",
  "dashmap",
  "futures",

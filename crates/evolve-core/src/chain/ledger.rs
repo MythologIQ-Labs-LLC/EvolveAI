@@ -2,6 +2,14 @@ use crate::chain::block::Block;
 use crate::chain::hash;
 use serde::{Deserialize, Serialize};
 
+/// Errors constructing a ledger from raw blocks.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum LedgerError {
+    /// A ledger must contain at least the genesis block.
+    #[error("ledger requires at least a genesis block")]
+    EmptyBlocks,
+}
+
 /// In-memory hash chain ledger providing append-only integrity.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ledger {
@@ -73,9 +81,21 @@ impl Ledger {
 
     /// Reconstruct ledger from existing blocks.
     /// Caller must ensure blocks form a valid chain.
+    ///
+    /// Panics if `blocks` is empty; prefer [`Ledger::try_from_blocks`] when
+    /// the blocks come from untrusted input (e.g. a deserialized snapshot).
     pub fn from_blocks(blocks: Vec<Block>) -> Self {
-        assert!(!blocks.is_empty(), "ledger requires at least genesis block");
-        Self { blocks }
+        Self::try_from_blocks(blocks).expect("ledger requires at least genesis block")
+    }
+
+    /// Reconstruct ledger from existing blocks, rejecting an empty set.
+    ///
+    /// Chain linkage is NOT verified here; call [`Ledger::verify`] afterward.
+    pub fn try_from_blocks(blocks: Vec<Block>) -> Result<Self, LedgerError> {
+        if blocks.is_empty() {
+            return Err(LedgerError::EmptyBlocks);
+        }
+        Ok(Self { blocks })
     }
 }
 

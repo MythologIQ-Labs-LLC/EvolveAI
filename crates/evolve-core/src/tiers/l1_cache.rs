@@ -30,7 +30,13 @@ impl L1Cache {
             self.evict_oldest();
         }
         let addr = unit.address.clone();
-        self.entries.insert(addr, CacheEntry { unit, inserted_at: now });
+        self.entries.insert(
+            addr,
+            CacheEntry {
+                unit,
+                inserted_at: now,
+            },
+        );
     }
 
     /// Retrieve a memory unit by address, returning `None` if expired.
@@ -44,7 +50,8 @@ impl L1Cache {
 
     /// Remove all entries whose TTL has elapsed.
     pub fn evict_expired(&mut self, now: i64) {
-        self.entries.retain(|_, e| now - e.inserted_at <= self.ttl_ms);
+        self.entries
+            .retain(|_, e| now - e.inserted_at <= self.ttl_ms);
     }
 
     /// Number of entries (including potentially expired).

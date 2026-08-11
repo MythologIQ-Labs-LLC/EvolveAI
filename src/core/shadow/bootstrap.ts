@@ -3,10 +3,10 @@
  * Pre-populate genome with canonical failure patterns
  */
 
-import type { RepresentationEngine } from '../representation/engine';
-import type { FailureCategory, FailureTrace } from './failure-types';
-import type { ShadowGenome } from './genome';
-import { createFailureTrace } from './failure-types';
+import type { RepresentationEngine } from '../representation/engine.js';
+import type { FailureCategory, FailureTrace } from './failure-types.js';
+import type { ShadowGenome } from './genome.js';
+import { createFailureTrace } from './failure-types.js';
 
 /**
  * Bootstrap pattern definition

@@ -5,17 +5,17 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { createMockEngine } from '../../core/representation';
-import type { RepresentationEngine } from '../../core/representation/engine';
-import { encodeReferencePatterns } from '../../core/tiers/reference-patterns';
-import type { ReferencePatterns } from '../../core/tiers/reference-patterns';
+import { createMockEngine } from '../../core/representation/index.js';
+import type { RepresentationEngine } from '../../core/representation/engine.js';
+import { encodeReferencePatterns } from '../../core/tiers/reference-patterns.js';
+import type { ReferencePatterns } from '../../core/tiers/reference-patterns.js';
 import {
   assessSensitivity,
   assessAccuracyRequirement,
   assessPrivilegeLevel,
   assessAll,
   type AssessmentContext
-} from '../../core/tiers/assessment';
+} from '../../core/tiers/assessment.js';
 
 describe('Semantic MTS Assessment', () => {
   let engine: RepresentationEngine;
