@@ -1,7 +1,7 @@
 use crate::chain::hash;
 use crate::chain::ledger::Ledger;
 use crate::memory::types::{MemoryUnit, UorAddress};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Operation kind recorded in the ledger when a unit is stored/crystallized.
 const OP_STORE: &str = "store";
@@ -52,6 +52,10 @@ pub enum IntegrityError {
     /// still present in the live vault.
     #[error("ledger records unit {address} as deleted, but it is still present")]
     DeletedUnitPresent { address: String },
+    /// A delete event does not bind the hash of the immediately preceding
+    /// recorded live state for that address.
+    #[error("delete event for memory {address} does not match its prior recorded live state")]
+    InvalidDeleteTransition { address: String },
     /// A structured ledger operation is syntactically valid but unknown to
     /// this implementation. Failing closed avoids silently assigning state
     /// semantics to a future or corrupted operation.
@@ -133,6 +137,23 @@ impl L3Vault {
         Some((op, addr, content_hash))
     }
 
+    /// Does the current unit hash match the latest recorded live state for
+    /// this address? Legacy bare-hash histories are supported as a fallback.
+    fn current_state_is_recorded(&self, addr: &UorAddress, current_hash: &str) -> bool {
+        for block in self.ledger.blocks().iter().rev() {
+            if let Some((op, recorded_addr, recorded_hash)) = Self::parse_entry(&block.data_hash) {
+                if recorded_addr != addr.as_str() {
+                    continue;
+                }
+                return matches!(op, OP_STORE | OP_UPDATE) && recorded_hash == current_hash;
+            }
+            if block.data_hash == current_hash {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Store a memory unit and record its hash on the ledger.
     /// pub(crate): only internal code can bypass the crystallization policy.
     ///
@@ -187,11 +208,16 @@ impl L3Vault {
     /// Remove an entry and record an explicit deletion in the hash chain.
     ///
     /// The deletion entry binds the address and exact pre-delete content hash.
-    /// If the current unit cannot be validated/serialized, deletion fails
-    /// closed and leaves both vault and ledger unchanged.
+    /// The current content must already match the latest recorded live state,
+    /// preventing an unrecorded mutation from being laundered by a later
+    /// delete. Validation/serialization or ledger-state mismatch fails closed
+    /// and leaves both vault and ledger unchanged.
     pub(crate) fn remove(&mut self, addr: &UorAddress) -> Option<MemoryUnit> {
         let unit = self.entries.get(addr)?;
         let content_hash = Self::hash_unit(unit).ok()?;
+        if !self.current_state_is_recorded(addr, &content_hash) {
+            return None;
+        }
         self.ledger
             .append(Self::entry_payload(OP_DELETE, addr, &content_hash));
         self.entries.remove(addr)
@@ -237,11 +263,13 @@ impl L3Vault {
     /// Full integrity verification with typed errors.
     ///
     /// 1. Block linkage / block hashes must be consistent.
-    /// 2. For structured ledger history, the latest operation for every
+    /// 2. Each delete must bind the immediately preceding recorded live-state
+    ///    hash for the same address (or a legacy bare hash).
+    /// 3. For structured ledger history, the latest operation for every
     ///    address determines whether the unit must be live (`store`/`update`)
     ///    or absent (`delete`).
-    /// 3. A live unit's canonical hash must equal the latest recorded hash.
-    /// 4. Legacy bare-hash blocks remain supported for live units created by
+    /// 4. A live unit's canonical hash must equal the latest recorded hash.
+    /// 5. Legacy bare-hash blocks remain supported for live units created by
     ///    pre-5.1 snapshots where the address was not recorded structurally.
     pub fn verify_full(&self) -> Result<(), IntegrityError> {
         if !self.ledger.verify() {
@@ -249,12 +277,39 @@ impl L3Vault {
         }
 
         let mut latest: HashMap<String, (String, String)> = HashMap::new();
+        let mut legacy_hashes: HashSet<String> = HashSet::new();
         for block in self.ledger.blocks() {
             if let Some((op, addr, recorded_hash)) = Self::parse_entry(&block.data_hash) {
+                match op {
+                    OP_STORE => {}
+                    OP_UPDATE => {}
+                    OP_DELETE => {
+                        let prior_structured_matches = latest
+                            .get(addr)
+                            .is_some_and(|(prior_op, prior_hash)| {
+                                matches!(prior_op.as_str(), OP_STORE | OP_UPDATE)
+                                    && prior_hash == recorded_hash
+                            });
+                        let prior_legacy_matches = legacy_hashes.contains(recorded_hash);
+                        if !prior_structured_matches && !prior_legacy_matches {
+                            return Err(IntegrityError::InvalidDeleteTransition {
+                                address: addr.to_string(),
+                            });
+                        }
+                    }
+                    _ => {
+                        return Err(IntegrityError::UnsupportedOperation {
+                            address: addr.to_string(),
+                            operation: op.to_string(),
+                        });
+                    }
+                }
                 latest.insert(
                     addr.to_string(),
                     (op.to_string(), recorded_hash.to_string()),
                 );
+            } else {
+                legacy_hashes.insert(block.data_hash.clone());
             }
         }
 
@@ -287,12 +342,7 @@ impl L3Vault {
                         });
                     }
                 }
-                _ => {
-                    return Err(IntegrityError::UnsupportedOperation {
-                        address: address.clone(),
-                        operation: operation.clone(),
-                    });
-                }
+                _ => unreachable!("structured operations were validated above"),
             }
         }
 
@@ -308,13 +358,7 @@ impl L3Vault {
                     address: address.clone(),
                     reason: e.to_string(),
                 })?;
-            let found = self
-                .ledger
-                .blocks()
-                .iter()
-                .rev()
-                .any(|block| block.data_hash == current_hash);
-            if !found {
+            if !legacy_hashes.contains(&current_hash) {
                 return Err(IntegrityError::MissingLedgerEntry { address });
             }
         }
