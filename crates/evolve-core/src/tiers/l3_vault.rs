@@ -284,9 +284,8 @@ impl L3Vault {
                     OP_STORE => {}
                     OP_UPDATE => {}
                     OP_DELETE => {
-                        let prior_structured_matches = latest
-                            .get(addr)
-                            .is_some_and(|(prior_op, prior_hash)| {
+                        let prior_structured_matches =
+                            latest.get(addr).is_some_and(|(prior_op, prior_hash)| {
                                 matches!(prior_op.as_str(), OP_STORE | OP_UPDATE)
                                     && prior_hash == recorded_hash
                             });
@@ -323,12 +322,11 @@ impl L3Vault {
                     let unit = live_unit.ok_or_else(|| IntegrityError::MissingLiveEntry {
                         address: address.clone(),
                     })?;
-                    let current_hash = Self::hash_unit(unit).map_err(|e| {
-                        IntegrityError::UnverifiableUnit {
+                    let current_hash =
+                        Self::hash_unit(unit).map_err(|e| IntegrityError::UnverifiableUnit {
                             address: address.clone(),
                             reason: e.to_string(),
-                        }
-                    })?;
+                        })?;
                     if &current_hash != recorded_hash {
                         return Err(IntegrityError::UnitHashMismatch {
                             address: address.clone(),
