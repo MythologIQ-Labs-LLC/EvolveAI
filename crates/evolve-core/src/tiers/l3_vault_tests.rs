@@ -1,5 +1,5 @@
 use super::l3_vault::{IntegrityError, L3Vault};
-use crate::chain::ledger::Ledger;
+use crate::chain::{hash, ledger::Ledger};
 use crate::memory::types::{MemoryUnit, Tier, UnitMetadata, UorAddress};
 
 fn make_unit(content: &str) -> MemoryUnit {
@@ -62,6 +62,45 @@ fn unrecorded_disappearance_fails_integrity() {
     assert_eq!(
         vault.verify_full().unwrap_err(),
         IntegrityError::MissingLiveEntry {
+            address: addr.as_str().to_string()
+        }
+    );
+}
+
+#[test]
+fn tampered_unit_cannot_be_laundered_by_delete() {
+    let mut vault = L3Vault::new();
+    let unit = make_unit("tamper-then-delete");
+    let addr = unit.address.clone();
+    vault.store(unit).unwrap();
+    let ledger_len = vault.ledger().len();
+
+    vault.get_mut(&addr).unwrap().saturation = 0.75;
+
+    assert!(vault.remove(&addr).is_none());
+    assert!(vault.get(&addr).is_some());
+    assert_eq!(vault.ledger().len(), ledger_len);
+    assert_eq!(
+        vault.verify_full().unwrap_err(),
+        IntegrityError::UnitHashMismatch {
+            address: addr.as_str().to_string()
+        }
+    );
+}
+
+#[test]
+fn forged_delete_hash_fails_transition_verification() {
+    let unit = make_unit("forged-delete");
+    let addr = unit.address.clone();
+    let actual_hash = hash::content_hash(&serde_json::to_vec(&unit).unwrap());
+    let mut ledger = Ledger::new();
+    ledger.append(format!("store:{addr}:{actual_hash}"));
+    ledger.append(format!("delete:{addr}:not-the-prior-hash"));
+    let vault = L3Vault::from_parts(vec![], ledger);
+
+    assert_eq!(
+        vault.verify_full().unwrap_err(),
+        IntegrityError::InvalidDeleteTransition {
             address: addr.as_str().to_string()
         }
     );
