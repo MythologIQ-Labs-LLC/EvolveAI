@@ -143,7 +143,7 @@ impl L3Vault {
         for block in self.ledger.blocks().iter().rev() {
             match Self::parse_entry(&block.data_hash) {
                 Some((op, recorded_addr, recorded_hash)) if recorded_addr == addr.as_str() => {
-                    return matches!(op, OP_STORE | OP_UPDATE) && recorded_hash == content_hash;
+                    return (op == OP_STORE || op == OP_UPDATE) && recorded_hash == content_hash;
                 }
                 Some(_) => {}
                 None if block.data_hash == content_hash => return true,
@@ -168,7 +168,10 @@ impl L3Vault {
             };
             match op {
                 OP_STORE => {
-                    states.insert(addr.to_string(), LedgerState::Live(content_hash.to_string()));
+                    states.insert(
+                        addr.to_string(),
+                        LedgerState::Live(content_hash.to_string()),
+                    );
                 }
                 OP_UPDATE => {
                     if matches!(states.get(addr), Some(LedgerState::Deleted(_))) {
@@ -177,7 +180,10 @@ impl L3Vault {
                             operation: op.to_string(),
                         });
                     }
-                    states.insert(addr.to_string(), LedgerState::Live(content_hash.to_string()));
+                    states.insert(
+                        addr.to_string(),
+                        LedgerState::Live(content_hash.to_string()),
+                    );
                 }
                 OP_DELETE => match states.get(addr) {
                     Some(LedgerState::Live(previous_hash)) if previous_hash == content_hash => {
@@ -357,7 +363,7 @@ impl L3Vault {
             let present = self
                 .entries
                 .keys()
-                .any(|candidate| candidate.as_str() == address);
+                .any(|candidate| candidate.as_str() == address.as_str());
             match state {
                 LedgerState::Live(_) if !present => {
                     return Err(IntegrityError::MissingLiveEntry { address });
