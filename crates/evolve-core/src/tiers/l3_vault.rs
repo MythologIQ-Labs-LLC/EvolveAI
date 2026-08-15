@@ -8,6 +8,14 @@ const OP_STORE: &str = "store";
 /// Operation kind recorded in the ledger when a stored unit is mutated
 /// through a legitimate trust update (saturation boost, entropy injection).
 const OP_UPDATE: &str = "update";
+/// Operation kind recorded when a stored unit is explicitly removed.
+const OP_DELETE: &str = "delete";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum LedgerState {
+    Live(String),
+    Deleted(String),
+}
 
 /// Errors from storing or mutating vault contents.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -38,6 +46,15 @@ pub enum IntegrityError {
     /// A stored unit has no corresponding ledger entry at all.
     #[error("no ledger entry found for stored unit {address}")]
     MissingLedgerEntry { address: String },
+    /// The ledger says an address is live but the vault no longer contains it.
+    #[error("ledger says memory {address} is live but the vault entry is missing")]
+    MissingLiveEntry { address: String },
+    /// The ledger says an address was deleted but the vault still contains it.
+    #[error("ledger says memory {address} was deleted but the vault entry is still present")]
+    DeletedEntryPresent { address: String },
+    /// Structured history contains an impossible or unsupported transition.
+    #[error("invalid ledger transition {operation} for memory {address}")]
+    InvalidLedgerTransition { address: String, operation: String },
     /// A stored unit could not be re-serialized for verification.
     #[error("stored unit {address} could not be serialized for verification: {reason}")]
     UnverifiableUnit { address: String, reason: String },
@@ -45,9 +62,10 @@ pub enum IntegrityError {
 
 /// L3 UOR Vault -- immutable memory with cryptographic integrity.
 ///
-/// Every state transition (store, crystallization, trust update) appends an
-/// entry to the hash-chained ledger, so vault contents can always be checked
-/// against the recorded history via [`L3Vault::verify_full`].
+/// Every state transition (store, crystallization, trust update, explicit
+/// deletion) appends an entry to the hash-chained ledger, so vault contents
+/// can always be reconciled against recorded history via
+/// [`L3Vault::verify_full`].
 pub struct L3Vault {
     entries: HashMap<UorAddress, MemoryUnit>,
     ledger: Ledger,
@@ -113,6 +131,97 @@ impl L3Vault {
         Some((op, addr, content_hash))
     }
 
+    fn legacy_hash_exists(&self, content_hash: &str) -> bool {
+        self.ledger.blocks().iter().any(|block| {
+            Self::parse_entry(&block.data_hash).is_none() && block.data_hash == content_hash
+        })
+    }
+
+    /// Return whether the live unit hash agrees with the newest ledger state
+    /// for this address. Legacy bare-hash history remains readable.
+    fn ledger_matches_live(&self, addr: &UorAddress, content_hash: &str) -> bool {
+        for block in self.ledger.blocks().iter().rev() {
+            match Self::parse_entry(&block.data_hash) {
+                Some((op, recorded_addr, recorded_hash)) if recorded_addr == addr.as_str() => {
+                    return (op == OP_STORE || op == OP_UPDATE) && recorded_hash == content_hash;
+                }
+                Some(_) => {}
+                None if block.data_hash == content_hash => return true,
+                None => {}
+            }
+        }
+        false
+    }
+
+    /// Replay structured ledger entries into their latest logical state.
+    ///
+    /// A structured `update` may be the first address-bearing record after a
+    /// legacy bare-hash store, so it establishes live state. A first
+    /// structured `delete` is accepted only when its prior-state hash exists
+    /// in legacy history. Deletes after structured state must match the latest
+    /// live hash exactly.
+    fn replay_structured_state(&self) -> Result<HashMap<String, LedgerState>, IntegrityError> {
+        let mut states = HashMap::new();
+        for block in self.ledger.blocks() {
+            let Some((op, addr, content_hash)) = Self::parse_entry(&block.data_hash) else {
+                continue;
+            };
+            match op {
+                OP_STORE => {
+                    states.insert(
+                        addr.to_string(),
+                        LedgerState::Live(content_hash.to_string()),
+                    );
+                }
+                OP_UPDATE => {
+                    if matches!(states.get(addr), Some(LedgerState::Deleted(_))) {
+                        return Err(IntegrityError::InvalidLedgerTransition {
+                            address: addr.to_string(),
+                            operation: op.to_string(),
+                        });
+                    }
+                    states.insert(
+                        addr.to_string(),
+                        LedgerState::Live(content_hash.to_string()),
+                    );
+                }
+                OP_DELETE => match states.get(addr) {
+                    Some(LedgerState::Live(previous_hash)) if previous_hash == content_hash => {
+                        states.insert(
+                            addr.to_string(),
+                            LedgerState::Deleted(content_hash.to_string()),
+                        );
+                    }
+                    Some(LedgerState::Live(_)) | Some(LedgerState::Deleted(_)) => {
+                        return Err(IntegrityError::InvalidLedgerTransition {
+                            address: addr.to_string(),
+                            operation: op.to_string(),
+                        });
+                    }
+                    None if self.legacy_hash_exists(content_hash) => {
+                        states.insert(
+                            addr.to_string(),
+                            LedgerState::Deleted(content_hash.to_string()),
+                        );
+                    }
+                    None => {
+                        return Err(IntegrityError::InvalidLedgerTransition {
+                            address: addr.to_string(),
+                            operation: op.to_string(),
+                        });
+                    }
+                },
+                _ => {
+                    return Err(IntegrityError::InvalidLedgerTransition {
+                        address: addr.to_string(),
+                        operation: op.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(states)
+    }
+
     /// Store a memory unit and record its hash on the ledger.
     /// pub(crate): only internal code can bypass the crystallization policy.
     ///
@@ -164,8 +273,24 @@ impl L3Vault {
         self.entries.get(addr)
     }
 
-    /// Remove an entry. Returns the unit if found.
+    /// Remove a live entry and append an audited deletion record.
+    ///
+    /// The delete payload keeps only address + last content hash. A missing
+    /// address appends nothing. If the live unit no longer agrees with its
+    /// ledger history, removal is refused rather than laundering an
+    /// unrecorded mutation into a legitimate deletion.
     pub(crate) fn remove(&mut self, addr: &UorAddress) -> Option<MemoryUnit> {
+        let content_hash = {
+            let unit = self.entries.get(addr)?;
+            let content_hash = Self::hash_unit(unit).ok()?;
+            if !self.ledger_matches_live(addr, &content_hash) {
+                return None;
+            }
+            content_hash
+        };
+
+        self.ledger
+            .append(Self::entry_payload(OP_DELETE, addr, &content_hash));
         self.entries.remove(addr)
     }
 
@@ -192,7 +317,7 @@ impl L3Vault {
         self.entries.is_empty()
     }
 
-    /// Verify chain linkage AND unit content against the ledger.
+    /// Verify chain linkage AND logical vault state against the ledger.
     /// Boolean convenience wrapper over [`L3Vault::verify_full`].
     pub fn verify_integrity(&self) -> bool {
         self.verify_full().is_ok()
@@ -201,14 +326,18 @@ impl L3Vault {
     /// Full integrity verification with typed errors.
     ///
     /// 1. Block linkage / block hashes must be consistent.
-    /// 2. Every stored unit is re-serialized and its content hash compared
-    ///    against the MOST RECENT ledger entry for its address. Legacy
-    ///    (pre-5.1) blocks recorded only the bare content hash, so for those
-    ///    a unit matches if its current hash equals the block's `data_hash`.
+    /// 2. Structured store/update/delete history is replayed and validated.
+    /// 3. Every stored unit must match the latest recorded live hash (or a
+    ///    compatible legacy bare-hash entry).
+    /// 4. Every structured address recorded as live must exist in the vault.
+    /// 5. Every structured address recorded as deleted must be absent.
     pub fn verify_full(&self) -> Result<(), IntegrityError> {
         if !self.ledger.verify() {
             return Err(IntegrityError::ChainLinkage);
         }
+
+        let states = self.replay_structured_state()?;
+
         for unit in self.entries.values() {
             let address = unit.address.as_str().to_string();
             let current_hash =
@@ -217,33 +346,35 @@ impl L3Vault {
                     reason: e.to_string(),
                 })?;
 
-            // Walk newest -> oldest: the first entry for this address is the
-            // most recent recorded state.
-            let mut verdict = None;
-            for block in self.ledger.blocks().iter().rev() {
-                match Self::parse_entry(&block.data_hash) {
-                    Some((_op, addr, recorded_hash)) => {
-                        if addr == unit.address.as_str() {
-                            verdict = Some(recorded_hash == current_hash);
-                            break;
-                        }
-                    }
-                    None => {
-                        // Legacy bare-hash block: can only be matched by
-                        // hash equality with the unit's current content.
-                        if block.data_hash == current_hash {
-                            verdict = Some(true);
-                            break;
-                        }
-                    }
+            match states.get(&address) {
+                Some(LedgerState::Live(recorded_hash)) if recorded_hash == &current_hash => {}
+                Some(LedgerState::Live(_)) => {
+                    return Err(IntegrityError::UnitHashMismatch { address });
                 }
-            }
-            match verdict {
-                Some(true) => {}
-                Some(false) => return Err(IntegrityError::UnitHashMismatch { address }),
+                Some(LedgerState::Deleted(_)) => {
+                    return Err(IntegrityError::DeletedEntryPresent { address });
+                }
+                None if self.legacy_hash_exists(&current_hash) => {}
                 None => return Err(IntegrityError::MissingLedgerEntry { address }),
             }
         }
+
+        for (address, state) in states {
+            let present = self
+                .entries
+                .keys()
+                .any(|candidate| candidate.as_str() == address.as_str());
+            match state {
+                LedgerState::Live(_) if !present => {
+                    return Err(IntegrityError::MissingLiveEntry { address });
+                }
+                LedgerState::Deleted(_) if present => {
+                    return Err(IntegrityError::DeletedEntryPresent { address });
+                }
+                LedgerState::Live(_) | LedgerState::Deleted(_) => {}
+            }
+        }
+
         Ok(())
     }
 
