@@ -6,4 +6,6 @@ pub mod router;
 pub use router::*;
 
 #[cfg(test)]
+mod delete_tests;
+#[cfg(test)]
 mod tests;
